@@ -1,4 +1,7 @@
 {
   "app": "npx tsx bin/app.ts",
-  "context": {}
+  "context": {
+    "domainName": "apps.wakalabo.net",
+    "certificateArn": "arn:aws:acm:us-east-1:812114845293:certificate/0a143b4d-ebb2-45ca-904c-df3723b3be2d"
+  }
 }
