@@ -1,0 +1,73 @@
+# wakalabo apps
+
+wakalabo の Web アプリをまとめるダッシュボードと、全アプリ共通のログインです。
+
+- **アプリ一覧**: 使えるアプリだけが表示されます (管理者はすべて)
+- **AWS** (管理者のみ): クレジットの残高と期限、今月・先月の利用額、アプリ別・サービス別の内訳、AWS コンソールへのリンク
+- **ユーザー管理** (管理者のみ): ユーザーの追加、使えるアプリの設定、管理者の切り替え、仮パスワードの再設定、停止、削除
+
+```
+[スマホ/PC] ─▶ CloudFront + S3 (React の画面)   https://apps.wakalabo.net
+     │
+     └─▶ API Gateway (共通ログインのトークン) ─▶ Lambda ─┬─▶ Cognito (ユーザー管理)
+                                                       ├─▶ Cost Explorer / Free Tier (利用料・クレジット)
+                                                       └─▶ SSM (利用料の 12 時間キャッシュ)
+```
+
+| ディレクトリ | 内容 |
+|---|---|
+| `shared/` | アプリの一覧 (`apps.ts`) と、API・画面で共有する型 |
+| `api/` | Lambda (TypeScript) |
+| `web/` | 画面 (React + Vite) |
+| `infra/` | AWS CDK。共通ログイン (Cognito)、API、画面、各アプリ用のログイン設定 (SSM) |
+
+## 共通ログイン
+
+ユーザープール `wakalabo-users` を全アプリで使います。どれか 1 つのアプリでログインすれば、他のアプリはログイン画面を通るだけで入れます。
+
+- 使えるアプリは Cognito のグループ `app-<アプリの id>` で決まります (画面の「ユーザー管理」で設定)
+- `admin` グループのユーザーは管理者です
+- 各アプリの CDK は、SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/domain`、`/wakalabo/auth/clients/<id>` を読んで共通ログインを使います
+
+### 新しいアプリを追加するとき
+
+1. `shared/apps.ts` の `APPS` に追加してデプロイ (アプリ用のログイン設定とグループができる)
+2. アプリ側の CDK で上の SSM パラメータを読み、AWS リソースに `app=<id>` のタグを付ける
+
+## デプロイ (ブラウザだけでできます)
+
+GitHub Actions からのデプロイは、このアカウントの制限 (SCP) で使えないため、AWS コンソールの **CloudShell** から行います。
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 22 >/dev/null \
+  && cd /tmp && rm -rf wakalabo-apps && git clone --depth 1 https://github.com/ikumi10132/wakalabo-apps.git && cd wakalabo-apps \
+  && npm ci && npm run build && cd infra && npx cdk deploy WakalaboApps --require-approval never
+```
+
+(`nvm: command not found` と出たら、先に `curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && source ~/.nvm/nvm.sh && nvm install 22`)
+
+### 最初の管理者を作る (初回だけ)
+
+画面からユーザーを追加するには管理者が必要なので、最初の 1 人だけ CloudShell で作ります。
+`<UserPoolId>` はデプロイ後に表示される `WakalaboApps.UserPoolId`。1 行で貼り付け、表示されたらパスワードを入力します
+(12 文字以上で英大文字・英小文字・数字・記号を含める)。
+
+```bash
+read -p "メールアドレス: " EMAIL && read -s -p "パスワード: " PW && echo && aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username "$EMAIL" --user-attributes Name=email,Value="$EMAIL" Name=email_verified,Value=true --message-action SUPPRESS >/dev/null && aws cognito-idp admin-set-user-password --user-pool-id <UserPoolId> --username "$EMAIL" --password "$PW" --permanent && aws cognito-idp admin-add-user-to-group --user-pool-id <UserPoolId> --username "$EMAIL" --group-name admin && echo "作成しました"; unset PW
+```
+
+### 独自ドメイン (apps.wakalabo.net)
+
+kakeibo と同じ手順です。CloudShell で us-east-1 に証明書を申請し、確認用の CNAME をお名前.com に登録、
+`ISSUED` になったら `infra/cdk.json` の context に `domainName` と `certificateArn` を書いてデプロイし、
+お名前.com で `apps` の CNAME を `WakalaboApps.CloudFrontDomain` に向けます。
+
+## アプリ別の利用料
+
+Cost Explorer で、AWS リソースの `app` タグごとに集計します。初回だけ、請求コンソールの
+**コスト配分タグ** で `app` を有効にしてください (タグの付いたリソースをデプロイしてから選べるようになります。反映まで最大 24 時間)。
+
+## 費用の目安
+
+Cognito・Lambda・API Gateway・CloudFront は個人利用ならほぼ無料枠内です。
+Cost Explorer API は 1 回 0.01 USD かかるため、結果を 12 時間保存して 1 日 2 回までに抑えています (最大でも月 約 0.6 USD)。
