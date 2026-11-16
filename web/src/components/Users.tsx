@@ -90,6 +90,10 @@ export function Users({ toast, handleError, me }: Shared & { me: string }) {
 
   return (
     <>
+      <header className="page-head">
+        <h1 className="page-title">ユーザー管理</h1>
+      </header>
+      <p className="muted">全アプリ共通のログインです。使えるアプリを選んで追加します。管理者はすべてのアプリを使えます。</p>
       <section className="card">
         <h2 className="card-title">ユーザーを追加</h2>
         <form className="admin-form" onSubmit={add}>

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { AppsResponse } from '../../shared/types';
 import { api, AuthError } from './api';
 import { handleRedirect, isLoggedIn, login, logout } from './auth';
 import { AppsGrid } from './components/AppsGrid';
 import { AwsPanel } from './components/AwsPanel';
+import { IconCloud, IconGrid, IconLogout, IconUsers } from './components/Icons';
 import { Users } from './components/Users';
 import { loadConfig } from './config';
 
@@ -50,11 +51,24 @@ export interface Shared {
   handleError: (e: unknown) => void;
 }
 
-type Tab = 'home' | 'users';
+type Tab = 'apps' | 'aws' | 'users';
+
+interface NavItem {
+  id: Tab;
+  label: string;
+  icon: (size: number) => ReactNode;
+  adminOnly?: boolean;
+}
+
+const NAV: NavItem[] = [
+  { id: 'apps', label: 'アプリ', icon: (s) => <IconGrid size={s} /> },
+  { id: 'aws', label: 'AWS', icon: (s) => <IconCloud size={s} />, adminOnly: true },
+  { id: 'users', label: 'ユーザー管理', icon: (s) => <IconUsers size={s} />, adminOnly: true },
+];
 
 function Main({ onAuthError }: { onAuthError: () => void }) {
   const [data, setData] = useState<AppsResponse | null>(null);
-  const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTab] = useState<Tab>('apps');
   const [toastMsg, setToastMsg] = useState<{ text: string; error?: boolean } | null>(null);
 
   const toast = useCallback((text: string, error = false) => {
@@ -75,45 +89,87 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
 
   const shared: Shared = { toast, handleError };
   const isAdmin = data?.me.isAdmin ?? false;
+  const nav = NAV.filter((n) => !n.adminOnly || isAdmin);
+  const go = (t: Tab) => {
+    setTab(t);
+    window.scrollTo({ top: 0 });
+  };
 
   return (
-    <div className="app">
-      <main className="content">
-        <header className="topbar">
-          <div className="brand">
-            <img src="/icon.svg" alt="" width={32} height={32} />
-            wakalabo apps
-          </div>
-          <div className="topbar-side">
-            {data && <span className="who">{data.me.email}{isAdmin && <span className="chip">管理者</span>}</span>}
-            <button className="btn btn-small btn-ghost" onClick={logout}>ログアウト</button>
-          </div>
-        </header>
-
-        {isAdmin && (
-          <div className="segmented" role="tablist">
-            {([
-              ['home', 'アプリと AWS'],
-              ['users', 'ユーザー管理'],
-            ] as const).map(([id, label]) => (
-              <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-                {label}
-              </button>
+    <div className={`shell${isAdmin ? ' has-tabbar' : ''}`}>
+      <aside className="sidebar" aria-label="メインメニュー">
+        <div className="brand">
+          <img src="/icon.svg" alt="" width={36} height={36} />
+          <span className="brand-text">
+            <strong>wakalabo apps</strong>
+            <span className="muted small">{location.host}</span>
+          </span>
+        </div>
+        <nav>
+          <ul className="side-nav">
+            {nav.map((n) => (
+              <li key={n.id}>
+                <button className={tab === n.id ? 'active' : ''} aria-current={tab === n.id ? 'page' : undefined} onClick={() => go(n.id)}>
+                  {n.icon(20)}
+                  <span className="grow">{n.label}</span>
+                </button>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+        </nav>
+        <div className="side-foot">
+          {data && (
+            <p className="who">
+              {data.me.email}
+              {isAdmin && <span className="chip">管理者</span>}
+            </p>
+          )}
+          <ul className="side-nav">
+            <li>
+              <button onClick={logout}>
+                <IconLogout />
+                <span className="grow">ログアウト</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <main className="main">
+        {/* スマホの上部 (PC では左メニューに出ている内容) */}
+        <header className="mobile-head phone-only">
+          <span className="brand">
+            <img src="/icon.svg" alt="" width={28} height={28} />
+            <strong>wakalabo apps</strong>
+          </span>
+          <button className="btn btn-small btn-ghost" onClick={logout}>ログアウト</button>
+        </header>
 
         {!data && <p className="muted center-text">読み込み中…</p>}
 
-        {data && tab === 'home' && (
+        {data && tab === 'apps' && (
           <>
-            <h2 className="section-title">アプリ</h2>
+            <header className="page-head">
+              <h1 className="page-title">アプリ</h1>
+            </header>
             <AppsGrid apps={data.apps} isAdmin={isAdmin} />
-            {isAdmin && <AwsPanel {...shared} />}
           </>
         )}
+        {data && tab === 'aws' && isAdmin && <AwsPanel {...shared} />}
         {data && tab === 'users' && isAdmin && <Users {...shared} me={data.me.username} />}
       </main>
+
+      {/* スマホの下のタブ (管理者だけ。管理者でなければアプリ一覧しかないので出さない) */}
+      {isAdmin && (
+        <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }} aria-label="画面の切り替え">
+          {nav.map((n) => (
+            <button key={n.id} className={tab === n.id ? 'active' : ''} aria-current={tab === n.id ? 'page' : undefined} onClick={() => go(n.id)}>
+              {n.icon(24)}
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {toastMsg && (
         <div className={`toast${toastMsg.error ? ' toast-error' : ''}`} role="status">

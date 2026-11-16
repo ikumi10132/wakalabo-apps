@@ -81,7 +81,9 @@ export function AwsPanel({ handleError, toast }: Shared) {
 
   return (
     <>
-      <h2 className="section-title">AWS</h2>
+      <header className="page-head">
+        <h1 className="page-title">AWS</h1>
+      </header>
       <section className="card">
         <div className="aws-grid">
           <div className="stat">

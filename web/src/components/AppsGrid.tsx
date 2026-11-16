@@ -1,12 +1,17 @@
 import type { AppDef } from '../../../shared/apps';
 import { REGION } from '../../../shared/apps';
+import { IconExternal } from './Icons';
 
 const stackUrl = (stack: string) =>
   `https://${REGION}.console.aws.amazon.com/cloudformation/home?region=${REGION}#/stacks?filteringText=${encodeURIComponent(stack)}`;
 
 export function AppsGrid({ apps, isAdmin }: { apps: AppDef[]; isAdmin: boolean }) {
   if (apps.length === 0) {
-    return <p className="muted center-text">使えるアプリがありません。管理者に追加してもらってください。</p>;
+    return (
+      <section className="card">
+        <p className="muted center-text">使えるアプリがありません。管理者に追加してもらってください。</p>
+      </section>
+    );
   }
   return (
     <div className="apps">
@@ -19,7 +24,9 @@ export function AppsGrid({ apps, isAdmin }: { apps: AppDef[]; isAdmin: boolean }
               <p className="app-desc">{a.description}</p>
             </div>
           </div>
-          <a className="btn btn-primary" href={a.url} target="_blank" rel="noreferrer">開く</a>
+          <a className="btn btn-primary" href={a.url} target="_blank" rel="noreferrer">
+            開く <IconExternal />
+          </a>
           {isAdmin && (
             <div className="app-links">
               {a.repo && <a href={`https://github.com/${a.repo}`} target="_blank" rel="noreferrer">GitHub</a>}
