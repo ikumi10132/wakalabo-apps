@@ -166,6 +166,8 @@ export function SsoApp() {
   // 入力欄にあらかじめ入れるのは「保存する」を選んだメールアドレスだけ
   const [email, setEmail] = useState(loadEmail() ?? '');
   // 前回の選択を引き継ぐ。初めてのときはチェック済み (外せば保存しない)
+  // ログインの方法: パスキーが使えるブラウザではパスキーを先に出し、パスワードは「パスワードでログイン」で開く
+  const [mode, setMode] = useState<'passkey' | 'password'>(() => (passkeySupported() ? 'passkey' : 'password'));
   const [rememberEmail, setRememberEmail] = useState(() => loadEmail() !== '');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -300,7 +302,10 @@ export function SsoApp() {
       });
       const options = r.ChallengeParameters?.CREDENTIAL_REQUEST_OPTIONS;
       if (r.ChallengeName !== 'WEB_AUTHN' || !options) {
-        throw new Error('このアカウントにはパスキーが登録されていません。パスワードでログインしてください');
+        // まだパスキーがない人は、パスワードの入力に切り替える (ログイン後にパスキーの登録をすすめる)
+        setMode('password');
+        setNotice('このアカウントにはまだパスキーがありません。パスワードでログインすると、続けてパスキーを登録できます');
+        return;
       }
       const credential = await getPasskey(options);
       const done = await cognito<InitiateAuthResponse>(cfg!.region, 'RespondToAuthChallenge', {
@@ -385,31 +390,58 @@ export function SsoApp() {
         {screen.name === 'error' && <p className="sso-error">{screen.text}</p>}
 
         {screen.name === 'login' && (
-          <form className="sso-form" onSubmit={submitLogin}>
+          <form
+            className="sso-form"
+            onSubmit={(e) => {
+              if (mode === 'passkey') {
+                e.preventDefault();
+                passkeyLogin();
+              } else submitLogin(e);
+            }}
+          >
             <label className="md-field">
-              <input className="md-input" placeholder=" " type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className="md-input" placeholder=" " type="email" autoComplete="username webauthn" required value={email} onChange={(e) => setEmail(e.target.value)} />
               <span className="md-label">メールアドレス</span>
             </label>
-            <label className="md-field">
-              <input className="md-input" placeholder=" " type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              <span className="md-label">パスワード</span>
-            </label>
+            {mode === 'password' && (
+              <label className="md-field">
+                <input className="md-input" placeholder=" " type="password" autoComplete="current-password" required autoFocus={!!email} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <span className="md-label">パスワード</span>
+              </label>
+            )}
             <label className="md-check">
               <input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} />
               <span>メールアドレスを保存する</span>
             </label>
-            <button className="md-btn md-filled" disabled={busy}>{busy ? 'ログイン中…' : 'ログイン'}</button>
-            {passkeySupported() && (
+            {mode === 'passkey' ? (
               <>
+                <button className="md-btn md-filled" disabled={busy}>
+                  <KeyIcon /> {busy ? '確認中…' : 'パスキーでログイン'}
+                </button>
+                <p className="sso-hint">Face ID / Touch ID で本人確認します</p>
                 <div className="sso-divider"><span>または</span></div>
-                <button type="button" className="md-btn md-tonal" disabled={busy} onClick={passkeyLogin}>
-                  <KeyIcon /> パスキーでログイン
+                <button type="button" className="md-btn md-outlined" disabled={busy} onClick={() => { setError(''); setMode('password'); }}>
+                  パスワードでログイン
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="md-btn md-filled" disabled={busy}>{busy ? 'ログイン中…' : 'ログイン'}</button>
+                {passkeySupported() && (
+                  <button type="button" className="md-btn md-text" disabled={busy} onClick={() => { setError(''); setNotice(''); setPassword(''); setMode('passkey'); }}>
+                    <KeyIcon /> パスキーでログインに戻る
+                  </button>
+                )}
+                <button type="button" className="md-btn md-text" onClick={() => { setNotice(''); setError(''); setScreen({ name: 'forgot' }); }}>
+                  パスワードを忘れた
                 </button>
               </>
             )}
-            <button type="button" className="md-btn md-text" onClick={() => { setNotice(''); setError(''); setScreen({ name: 'forgot' }); }}>
-              パスワードを忘れた
-            </button>
+            {mode === 'passkey' && (
+              <p className="sso-hint">
+                初めての方・パスキーを登録していない方は「パスワードでログイン」から。ログイン後にパスキーを登録できます
+              </p>
+            )}
           </form>
         )}
 

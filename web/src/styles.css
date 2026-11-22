@@ -562,6 +562,7 @@ a.md-btn { text-decoration: none; }
 /* パスキー */
 .sso-divider { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--md-on-surface-variant); margin: -4px 0; }
 .sso-divider::before, .sso-divider::after { content: ''; flex: 1; border-top: 1px solid var(--md-outline-variant); }
+.sso-hint { font-size: 12px; color: var(--md-on-surface-variant); text-align: center; margin-top: -12px; }
 .sso-subtitle { font-size: 20px; font-weight: 500; }
 .sso-passkey-hero { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: var(--md-primary-container); color: var(--md-on-primary-container); }
 .sso-passkey-hero svg { width: 32px; height: 32px; }
