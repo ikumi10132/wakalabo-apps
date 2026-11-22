@@ -79,10 +79,11 @@ Constraints for each level:
 
 # このプロジェクトについて
 
-- wakalabo の Web アプリをまとめるダッシュボード (apps.wakalabo.net) と、**全アプリ共通のログイン (Cognito ユーザープール wakalabo-users)**
+- wakalabo の Web アプリをまとめるダッシュボード (apps.wakalabo.net) と、**全アプリ共通のログイン W-SSO** (自作のログイン画面 web/src/sso/ + Cognito ユーザープール wakalabo-users。プール名は変えない)
 - 構成は kakeibo / smart-home-dashboard とそろえる (npm workspaces: `api` / `web` / `infra` + 共有の `shared`、TypeScript、CDK、React + Vite)
 - アプリの一覧は `shared/apps.ts`。新しいアプリを作ったらここに足す。デプロイすると、共通ログイン用のアプリ クライアントとグループ (app-<id>) が作られ、
-  SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/domain`、`/wakalabo/auth/clients/<id>` にアプリ側の CDK が読む値が入る
+  SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/wsso-client-id`、`/wakalabo/auth/sso-url` にアプリ側の CDK が読む値が入る。
+  アプリの画面は web/src/wsso-client.ts をコピーして W-SSO を使う
 - 各アプリの AWS リソースには `app=<id>` のタグを付ける (Cost Explorer でアプリ別の利用料を出すため)
 - 管理者 = Cognito の admin グループ。API 側でトークンの cognito:groups を確認する
 - デプロイはユーザーが AWS CloudShell で README のコマンドを貼り付けて行う。このアカウントは SCP で GitHub の OIDC 連携が禁止されており、GitHub Actions からはデプロイできない

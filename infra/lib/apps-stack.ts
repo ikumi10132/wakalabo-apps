@@ -96,8 +96,33 @@ export class AppsStack extends cdk.Stack {
         refreshTokenValidity: cdk.Duration.days(30),
       });
 
-    // ダッシュボード自身
+    // ダッシュボード自身 (Cognito のログイン画面を使っていたころのもの。W-SSO に移ったので使っていない)
     const portalClient = oauthClient('PortalClient', [...siteUrls, LOCAL_DEV_URL]);
+
+    // ---------- W-SSO (自作のログイン画面 /sso.html で使う、全アプリ共通のクライアント) ----------
+    // パスワードは画面から Cognito に直接送る (USER_PASSWORD_AUTH、通信は HTTPS)。
+    // 各アプリの API は、このクライアントのアクセストークンを受け付け、グループ (admin / app-<id>) で使えるか判断する
+    const wssoClient = userPool.addClient('WssoClient', {
+      generateSecret: false,
+      authFlows: { userPassword: true },
+      preventUserExistenceErrors: true,
+      enableTokenRevocation: true,
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
+    });
+    new ssm.StringParameter(this, 'WssoClientParam', {
+      parameterName: `${AUTH_PARAM_PREFIX}/wsso-client-id`,
+      stringValue: wssoClient.userPoolClientId,
+      description: 'W-SSO の共通クライアント ID',
+    });
+    new ssm.StringParameter(this, 'SsoUrlParam', {
+      parameterName: `${AUTH_PARAM_PREFIX}/sso-url`,
+      stringValue: siteUrls[0]!,
+      description: 'W-SSO のログイン画面がある URL',
+    });
+    // W-SSO がログイン後に戻ってよいアプリ (これ以外には戻さない)
+    const allowedOrigins = [...new Set([...siteUrls, ...APPS.map((a) => new URL(a.url).origin), LOCAL_DEV_URL])];
 
     // 各アプリ用。グループ (app-<id>) と、アプリ側の CDK が読むための SSM パラメータも作る。
     // 同じユーザープールなので、どれか 1 つでログインすれば、他のアプリもログイン画面を通るだけで入れる
@@ -177,7 +202,7 @@ export class AppsStack extends cdk.Stack {
     const authorizer = new HttpJwtAuthorizer(
       'CognitoAuthorizer',
       `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
-      { jwtAudience: [portalClient.userPoolClientId] },
+      { jwtAudience: [portalClient.userPoolClientId, wssoClient.userPoolClientId] },
     );
     const api = new apigw.HttpApi(this, 'HttpApi', {
       defaultAuthorizer: authorizer,
@@ -203,8 +228,8 @@ export class AppsStack extends cdk.Stack {
         s3deploy.Source.asset(path.join(root, 'web/dist')),
         s3deploy.Source.jsonData('config.json', {
           apiUrl: api.apiEndpoint,
-          userPoolClientId: portalClient.userPoolClientId,
-          cognitoDomain: domain.baseUrl(),
+          wssoClientId: wssoClient.userPoolClientId,
+          allowedOrigins,
           region: this.region,
           account: this.account,
         }),

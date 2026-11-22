@@ -39,7 +39,7 @@ export function App() {
       <div className="center login">
         <img src="/icon.svg" alt="" width={64} height={64} />
         <h1>wakalabo apps</h1>
-        <button className="btn btn-primary btn-wide" onClick={() => void login()}>ログイン</button>
+        <button className="btn btn-primary btn-wide" onClick={() => login()}>W-SSO でログイン</button>
       </div>
     );
   }

@@ -21,18 +21,24 @@ wakalabo の Web アプリをまとめるダッシュボードと、全アプリ
 | `web/` | 画面 (React + Vite) |
 | `infra/` | AWS CDK。共通ログイン (Cognito)、API、画面、各アプリ用のログイン設定 (SSM) |
 
-## 共通ログイン
+## 共通ログイン (W-SSO)
 
-ユーザープール `wakalabo-users` を全アプリで使います。どれか 1 つのアプリでログインすれば、他のアプリはログイン画面を通るだけで入れます。
+wakalabo の全アプリで使うログインです。ログイン画面は自作 (`https://apps.wakalabo.net/sso.html`、`web/src/sso/`) で、
+パスワードの確認は Amazon Cognito (ユーザープール `wakalabo-users`) が行います。
 
-- 使えるアプリは Cognito のグループ `app-<アプリの id>` で決まります (画面の「ユーザー管理」で設定)
-- `admin` グループのユーザーは管理者です
-- 各アプリの CDK は、SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/domain`、`/wakalabo/auth/clients/<id>` を読んで共通ログインを使います
+- アプリは `login()` で W-SSO に移動し、ログイン後は URL の `#wsso=...` でトークンを受け取って戻る (`web/src/wsso-client.ts` を各アプリにコピーして使う)
+- 一度ログインすれば、ほかのアプリは入力なしで入れる (W-SSO の画面がリフレッシュトークンを覚えている)。ログアウトはすべてのアプリから
+- 戻ってよいのは `shared/apps.ts` のアプリとダッシュボードのオリジンだけ
+- 初回ログイン時の新しいパスワードの設定、「パスワードを忘れた」(確認コードをメールで送る) も W-SSO の画面で行う
+- 使えるアプリは Cognito のグループ `app-<アプリの id>` で決まる (画面の「ユーザー管理」で設定)。`admin` グループは管理者
+- 各アプリの CDK は SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/wsso-client-id`、`/wakalabo/auth/sso-url` を読んで、
+  API で W-SSO のアクセストークンを受け付ける。権限 (グループ) は各アプリの API でも確認する
+- ユーザープールの名前は変えない (変えると作り直しになり、全ユーザーが消える)。「W-SSO」は表示名
 
 ### 新しいアプリを追加するとき
 
-1. `shared/apps.ts` の `APPS` に追加してデプロイ (アプリ用のログイン設定とグループができる)
-2. アプリ側の CDK で上の SSM パラメータを読み、AWS リソースに `app=<id>` のタグを付ける
+1. `shared/apps.ts` の `APPS` に追加してデプロイ (グループと、W-SSO から戻れる URL に追加される)
+2. アプリ側: `wsso-client.ts` をコピーし、CDK で上の SSM パラメータを読む。AWS リソースに `app=<id>` のタグを付ける
 
 ## デプロイ (ブラウザだけでできます)
 
