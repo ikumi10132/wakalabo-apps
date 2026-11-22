@@ -115,6 +115,13 @@ async function adminRoute(event: APIGatewayProxyEventV2WithJWTAuthorizer, c: Cal
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> {
   try {
     const c = caller(event);
+    // 管理者がアプリの権限を変えたら、ログインし直さなくてもすぐ反映する (聞けなければトークンの中身を使う)
+    try {
+      c.groups = await users.groupsOf(c.username);
+      c.isAdmin = c.groups.includes(users.ADMIN_GROUP_NAME);
+    } catch (e) {
+      console.warn('groups: fallback to token', (e as Error).message);
+    }
     if (event.routeKey === 'GET /apps') {
       const res: AppsResponse = {
         me: { username: c.username, email: await users.getEmail(c.username), isAdmin: c.isAdmin },

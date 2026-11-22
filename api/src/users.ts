@@ -6,6 +6,7 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   AdminGetUserCommand,
+  AdminListGroupsForUserCommand,
   AdminRemoveUserFromGroupCommand,
   AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
@@ -35,6 +36,12 @@ export function groupsFromClaim(claim: unknown): string[] {
 export const appsFromGroups = (groups: string[]) => APPS.filter((a) => groups.includes(appGroup(a.id))).map((a) => a.id);
 
 const attr = (attrs: AttributeType[] | undefined, name: string) => attrs?.find((a) => a.Name === name)?.Value;
+
+/** いまのグループ (ログインのトークンの中身は最大 1 時間古いので、権限の変更をすぐ反映するために Cognito に聞く) */
+export async function groupsOf(username: string): Promise<string[]> {
+  const res = await cognito.send(new AdminListGroupsForUserCommand({ UserPoolId: POOL, Username: username, Limit: 60 }));
+  return (res.Groups ?? []).map((g) => g.GroupName!).filter(Boolean);
+}
 
 export async function getEmail(username: string): Promise<string> {
   const res = await cognito.send(new AdminGetUserCommand({ UserPoolId: POOL, Username: username }));

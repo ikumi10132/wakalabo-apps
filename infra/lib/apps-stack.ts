@@ -192,6 +192,7 @@ export class AppsStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: [
           'cognito-idp:AdminGetUser',
+          'cognito-idp:AdminListGroupsForUser',
           'cognito-idp:ListUsers',
           'cognito-idp:ListUsersInGroup',
           'cognito-idp:AdminCreateUser',
