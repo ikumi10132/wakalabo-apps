@@ -19,6 +19,8 @@ interface SsoConfig {
 }
 
 const SESSION_KEY = 'wsso.session';
+/** 「メールアドレスを保存する」を選んだときのメールアドレス (ログアウトしても残る。次回の入力を省くため) */
+const EMAIL_KEY = 'wsso.email';
 /** 「パスキーの登録を今後すすめない」を選んだメールアドレス */
 const NO_OFFER_KEY = 'wsso.passkeyNoOffer';
 const PASSWORD_HINT = '12 文字以上で、英大文字・英小文字・数字・記号をそれぞれ含めてください';
@@ -41,6 +43,22 @@ const saveStored = (s: Stored | null) => {
     else localStorage.removeItem(SESSION_KEY);
   } catch {
     /* 保存できないときは、毎回ログインが必要になるだけ */
+  }
+};
+
+const loadEmail = (): string | null => {
+  try {
+    return localStorage.getItem(EMAIL_KEY);
+  } catch {
+    return null;
+  }
+};
+/** 保存しないを選んだときは空文字を置き、次回もチェックを外したままにする */
+const saveEmail = (email: string | null) => {
+  try {
+    localStorage.setItem(EMAIL_KEY, email ?? '');
+  } catch {
+    /* noop */
   }
 };
 
@@ -145,7 +163,10 @@ export function SsoApp() {
 
   const [cfg, setCfg] = useState<SsoConfig | null>(null);
   const [screen, setScreen] = useState<Screen>({ name: 'loading' });
-  const [email, setEmail] = useState(loadStored()?.email ?? '');
+  // 入力欄にあらかじめ入れるのは「保存する」を選んだメールアドレスだけ
+  const [email, setEmail] = useState(loadEmail() ?? '');
+  // 前回の選択を引き継ぐ。初めてのときはチェック済み (外せば保存しない)
+  const [rememberEmail, setRememberEmail] = useState(() => loadEmail() !== '');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState('');
@@ -156,8 +177,10 @@ export function SsoApp() {
    * ログインできたら、アプリの権限を確かめてアプリに戻す。
    * viaPassword: パスワードでログインしたとき。この端末でパスキーが使えて、まだ登録していなければ登録をすすめる
    */
-  const finish = async (c: SsoConfig, r: AuthResult, refreshToken: string, who: string, viaPassword = false) => {
+  const finish = async (c: SsoConfig, r: AuthResult, refreshToken: string, who: string, viaPassword = false, remember?: boolean) => {
     saveStored({ email: who, refreshToken });
+    // ログイン画面で入力してログインしたときだけ、保存するかどうかの選択を反映する
+    if (remember !== undefined) saveEmail(remember ? who : null);
     if (manage) {
       setScreen({ name: 'manage', accessToken: r.AccessToken, email: who });
       return;
@@ -258,7 +281,7 @@ export function SsoApp() {
         return;
       }
       if (!r.AuthenticationResult?.RefreshToken) throw new Error(`ログインを完了できませんでした (${r.ChallengeName ?? '不明'})`);
-      await finish(cfg!, r.AuthenticationResult, r.AuthenticationResult.RefreshToken, email.trim(), true);
+      await finish(cfg!, r.AuthenticationResult, r.AuthenticationResult.RefreshToken, email.trim(), true, rememberEmail);
     });
   };
 
@@ -287,7 +310,7 @@ export function SsoApp() {
         ChallengeResponses: { USERNAME: who, CREDENTIAL: JSON.stringify(credential) },
       });
       if (!done.AuthenticationResult?.RefreshToken) throw new Error('パスキーでログインできませんでした');
-      await finish(cfg!, done.AuthenticationResult, done.AuthenticationResult.RefreshToken, who);
+      await finish(cfg!, done.AuthenticationResult, done.AuthenticationResult.RefreshToken, who, false, rememberEmail);
     });
   };
 
@@ -302,7 +325,7 @@ export function SsoApp() {
         ChallengeResponses: { USERNAME: screen.username, NEW_PASSWORD: password },
       });
       if (!r.AuthenticationResult?.RefreshToken) throw new Error('パスワードを設定できませんでした');
-      await finish(cfg!, r.AuthenticationResult, r.AuthenticationResult.RefreshToken, email.trim(), true);
+      await finish(cfg!, r.AuthenticationResult, r.AuthenticationResult.RefreshToken, email.trim(), true, rememberEmail);
     });
   };
 
@@ -370,6 +393,10 @@ export function SsoApp() {
             <label className="md-field">
               <input className="md-input" placeholder=" " type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               <span className="md-label">パスワード</span>
+            </label>
+            <label className="md-check">
+              <input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} />
+              <span>メールアドレスを保存する</span>
             </label>
             <button className="md-btn md-filled" disabled={busy}>{busy ? 'ログイン中…' : 'ログイン'}</button>
             {passkeySupported() && (
@@ -452,7 +479,7 @@ export function SsoApp() {
           </div>
         )}
       </div>
-      <p className="sso-foot">パスワードとパスキーは Amazon Cognito で確認され、このページには保存されません。</p>
+      <p className="sso-foot">パスワードとパスキーは Amazon Cognito で確認され、このページには保存されません。メールアドレスは「保存する」を選んだときだけ、この端末に保存されます。</p>
     </div>
   );
 }

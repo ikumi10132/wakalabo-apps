@@ -548,6 +548,14 @@ a.btn-primary { color: var(--accent-text); }
 .md-filled:hover:not(:disabled) { box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15); }
 .md-outlined { background: transparent; color: var(--md-primary); border: 1px solid var(--md-outline); width: 100%; }
 .md-text { background: transparent; color: var(--md-primary); align-self: center; min-height: 40px; padding: 0 12px; }
+/* checkbox: 18px の角丸の箱、チェック時は primary で塗る */
+.md-check { display: flex; align-items: center; gap: 12px; margin: -6px 0 -4px; padding: 4px 0; font-size: 14px; color: var(--md-on-surface); cursor: pointer; align-self: flex-start; }
+.md-check input {
+  appearance: none; -webkit-appearance: none; flex: none; margin: 0; width: 18px; height: 18px; border-radius: 2px;
+  border: 2px solid var(--md-on-surface-variant); display: grid; place-items: center; cursor: pointer;
+}
+.md-check input:checked { background: var(--md-primary); border-color: var(--md-primary); }
+.md-check input:checked::after { content: ''; width: 5px; height: 10px; border: solid var(--md-on-primary); border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
 .md-tonal { background: var(--md-primary-container); color: var(--md-on-primary-container); width: 100%; }
 a.md-btn { text-decoration: none; }
 
