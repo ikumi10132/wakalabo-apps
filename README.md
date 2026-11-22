@@ -30,6 +30,10 @@ wakalabo の全アプリで使うログインです。ログイン画面は自�
 - 一度ログインすれば、ほかのアプリは入力なしで入れる (W-SSO の画面がリフレッシュトークンを覚えている)。ログアウトはすべてのアプリから
 - 戻ってよいのは `shared/apps.ts` のアプリとダッシュボードのオリジンだけ
 - 初回ログイン時の新しいパスワードの設定、「パスワードを忘れた」(確認コードをメールで送る) も W-SSO の画面で行う
+- **パスキー** (Face ID / Touch ID) でもログインできる。パスワードでログインしたあと、この端末で使えれば登録をすすめる。
+  一覧・追加・削除はダッシュボードの「パスキー」(`/sso.html?app=portal&manage=1&return=...`)。
+  パスキーのドメイン (relying party) は `wakalabo.net` (独自ドメイン `apps.wakalabo.net` の親) で、Cognito の Essentials プランの機能 (月 10,000 人まで無料)。
+  パスワードは予備として残している (新しい端末やパスキーが使えないとき用)
 - 使えるアプリは Cognito のグループ `app-<アプリの id>` で決まる (画面の「ユーザー管理」で設定)。`admin` グループは管理者
 - 各アプリの CDK は SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/wsso-client-id`、`/wakalabo/auth/sso-url` を読んで、
   API で W-SSO のアクセストークンを受け付ける。権限 (グループ) は各アプリの API でも確認する

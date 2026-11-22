@@ -4,8 +4,11 @@ import { api, AuthError } from './api';
 import { handleRedirect, isLoggedIn, login, logout } from './auth';
 import { AppsGrid } from './components/AppsGrid';
 import { AwsPanel } from './components/AwsPanel';
-import { IconCloud, IconGrid, IconLogout, IconUsers } from './components/Icons';
+import { IconCloud, IconGrid, IconLogout, IconUsers, IconKey } from './components/Icons';
 import { Users } from './components/Users';
+
+/** W-SSO のパスキーの管理画面 (同じサイトの sso.html) */
+const PASSKEY_URL = () => `/sso.html?app=portal&manage=1&return=${encodeURIComponent(`${location.origin}/`)}`;
 import { loadConfig } from './config';
 
 type Phase = { name: 'loading' } | { name: 'login' } | { name: 'ready' } | { name: 'error'; message: string };
@@ -126,6 +129,12 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
           )}
           <ul className="side-nav">
             <li>
+              <a className="side-link" href={PASSKEY_URL()}>
+                <IconKey />
+                <span className="grow">パスキー</span>
+              </a>
+            </li>
+            <li>
               <button onClick={logout}>
                 <IconLogout />
                 <span className="grow">ログアウト</span>
@@ -142,7 +151,10 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
             <img src="/icon.svg" alt="" width={28} height={28} />
             <strong>wakalabo apps</strong>
           </span>
-          <button className="btn btn-small btn-ghost" onClick={logout}>ログアウト</button>
+          <span className="head-actions">
+            <a className="btn btn-small btn-ghost" href={PASSKEY_URL()}>パスキー</a>
+            <button className="btn btn-small btn-ghost" onClick={logout}>ログアウト</button>
+          </span>
         </header>
 
         {!data && <p className="muted center-text">読み込み中…</p>}

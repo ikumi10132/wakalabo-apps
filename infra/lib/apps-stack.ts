@@ -64,6 +64,8 @@ export class AppsStack extends cdk.Stack {
     const siteUrls = props.domainName ? [`https://${props.domainName}`, cloudfrontUrl] : [cloudfrontUrl];
 
     // ---------- 共通ログイン (Cognito) ----------
+    // パスキーのドメイン: apps.wakalabo.net → wakalabo.net (独自ドメインがないときはパスキーを使わない)
+    const passkeyRpId = props.domainName?.split('.').slice(1).join('.');
     // すべてのアプリで使うユーザープール。ここでユーザーを作り、使えるアプリをグループで決める
     const userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: 'wakalabo-users',
@@ -72,6 +74,14 @@ export class AppsStack extends cdk.Stack {
       passwordPolicy: { minLength: 12 },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // パスキー (WebAuthn) でもログインできるようにする。パスキーは Essentials プランの機能 (月 10,000 人まで無料)。
+      // 以下はどれもユーザープールを作り直さずに変更できる設定 (作り直すとユーザーが消えるので、名前などは変えない)
+      featurePlan: cognito.FeaturePlan.ESSENTIALS,
+      signInPolicy: { allowedFirstAuthFactors: { password: true, passkey: !!passkeyRpId } },
+      // パスキーを結び付けるドメイン。W-SSO の画面 (apps.wakalabo.net) から使うので、その親の wakalabo.net にする
+      ...(passkeyRpId && { passkeyRelyingPartyId: passkeyRpId }),
+      // Face ID / Touch ID / PIN などの本人確認ができるパスキーだけ受け付ける (パスキーだけでログインできるため)
+      passkeyUserVerification: cognito.PasskeyUserVerification.REQUIRED,
     });
     const domain = userPool.addDomain('Domain', { cognitoDomain: { domainPrefix: `wakalabo-${this.account}` } });
 
@@ -104,7 +114,8 @@ export class AppsStack extends cdk.Stack {
     // 各アプリの API は、このクライアントのアクセストークンを受け付け、グループ (admin / app-<id>) で使えるか判断する
     const wssoClient = userPool.addClient('WssoClient', {
       generateSecret: false,
-      authFlows: { userPassword: true },
+      // userPassword: パスワードでログイン (USER_PASSWORD_AUTH)、user: パスキーでログイン (USER_AUTH)
+      authFlows: { userPassword: true, user: true },
       preventUserExistenceErrors: true,
       enableTokenRevocation: true,
       accessTokenValidity: cdk.Duration.hours(1),

@@ -84,6 +84,7 @@ Constraints for each level:
 - アプリの一覧は `shared/apps.ts`。新しいアプリを作ったらここに足す。デプロイすると、共通ログイン用のアプリ クライアントとグループ (app-<id>) が作られ、
   SSM パラメータ `/wakalabo/auth/user-pool-id`、`/wakalabo/auth/wsso-client-id`、`/wakalabo/auth/sso-url` にアプリ側の CDK が読む値が入る。
   アプリの画面は web/src/wsso-client.ts をコピーして W-SSO を使う
+- W-SSO はパスキーにも対応 (web/src/sso/passkey.ts、USER_AUTH + WEB_AUTHN、relying party は wakalabo.net)。ユーザープールの設定を変えるときは、デプロイ前に `cdk diff` で UserPool が作り直し (replace) にならないことを確かめる
 - 各アプリの AWS リソースには `app=<id>` のタグを付ける (Cost Explorer でアプリ別の利用料を出すため)
 - 管理者 = Cognito の admin グループ。API 側でトークンの cognito:groups を確認する
 - デプロイはユーザーが AWS CloudShell で README のコマンドを貼り付けて行う。このアカウントは SCP で GitHub の OIDC 連携が禁止されており、GitHub Actions からはデプロイできない
