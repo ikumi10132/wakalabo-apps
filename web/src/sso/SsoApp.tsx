@@ -254,7 +254,7 @@ export function SsoApp() {
           <span className="sso-logo" aria-hidden="true">W</span>
           <div>
             <p className="sso-name">W-SSO</p>
-            <p className="muted small">wakalabo 共通ログイン</p>
+            <p className="sso-sub">wakalabo 共通ログイン</p>
           </div>
         </div>
 
@@ -266,21 +266,21 @@ export function SsoApp() {
         {notice && <p className="sso-notice" role="status">{notice}</p>}
         {error && <p className="sso-error" role="alert">{error}</p>}
 
-        {screen.name === 'loading' && <p className="muted center-text">確認中…</p>}
+        {screen.name === 'loading' && <div className="md-progress" role="progressbar" aria-label="確認中" />}
         {screen.name === 'error' && <p className="sso-error">{screen.text}</p>}
 
         {screen.name === 'login' && (
           <form className="sso-form" onSubmit={submitLogin}>
-            <label className="field">
-              <span>メールアドレス</span>
-              <input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label className="md-field">
+              <input className="md-input" placeholder=" " type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <span className="md-label">メールアドレス</span>
             </label>
-            <label className="field">
-              <span>パスワード</span>
-              <input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label className="md-field">
+              <input className="md-input" placeholder=" " type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <span className="md-label">パスワード</span>
             </label>
-            <button className="btn btn-primary btn-block btn-large" disabled={busy}>{busy ? 'ログイン中…' : 'ログイン'}</button>
-            <button type="button" className="link-button" onClick={() => { setNotice(''); setError(''); setScreen({ name: 'forgot' }); }}>
+            <button className="md-btn md-filled" disabled={busy}>{busy ? 'ログイン中…' : 'ログイン'}</button>
+            <button type="button" className="md-btn md-text" onClick={() => { setNotice(''); setError(''); setScreen({ name: 'forgot' }); }}>
               パスワードを忘れた
             </button>
           </form>
@@ -288,40 +288,40 @@ export function SsoApp() {
 
         {screen.name === 'newPassword' && (
           <form className="sso-form" onSubmit={submitNewPassword}>
-            <label className="field">
-              <span>新しいパスワード</span>
-              <input className="input" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              <span className="muted small">{PASSWORD_HINT}</span>
+            <label className="md-field">
+              <input className="md-input" placeholder=" " type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <span className="md-label">新しいパスワード</span>
+              <span className="md-support">{PASSWORD_HINT}</span>
             </label>
-            <button className="btn btn-primary btn-block btn-large" disabled={busy}>パスワードを設定してログイン</button>
+            <button className="md-btn md-filled" disabled={busy}>パスワードを設定してログイン</button>
           </form>
         )}
 
         {screen.name === 'forgot' && (
           <form className="sso-form" onSubmit={submitForgot}>
-            <p className="small">登録しているメールアドレスに、パスワードを再設定するための確認コードを送ります。</p>
-            <label className="field">
-              <span>メールアドレス</span>
-              <input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <p className="sso-text">登録しているメールアドレスに、パスワードを再設定するための確認コードを送ります。</p>
+            <label className="md-field">
+              <input className="md-input" placeholder=" " type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <span className="md-label">メールアドレス</span>
             </label>
-            <button className="btn btn-primary btn-block btn-large" disabled={busy}>確認コードを送る</button>
-            <button type="button" className="link-button" onClick={() => { setError(''); setScreen({ name: 'login' }); }}>ログインに戻る</button>
+            <button className="md-btn md-filled" disabled={busy}>確認コードを送る</button>
+            <button type="button" className="md-btn md-text" onClick={() => { setError(''); setScreen({ name: 'login' }); }}>ログインに戻る</button>
           </form>
         )}
 
         {screen.name === 'reset' && (
           <form className="sso-form" onSubmit={submitReset}>
-            <label className="field">
-              <span>確認コード (メールに書かれた数字)</span>
-              <input className="input" inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />
+            <label className="md-field">
+              <input className="md-input" placeholder=" " inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />
+              <span className="md-label">確認コード (メールに書かれた数字)</span>
             </label>
-            <label className="field">
-              <span>新しいパスワード</span>
-              <input className="input" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              <span className="muted small">{PASSWORD_HINT}</span>
+            <label className="md-field">
+              <input className="md-input" placeholder=" " type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <span className="md-label">新しいパスワード</span>
+              <span className="md-support">{PASSWORD_HINT}</span>
             </label>
-            <button className="btn btn-primary btn-block btn-large" disabled={busy}>パスワードを変更</button>
-            <button type="button" className="link-button" onClick={() => { setError(''); setScreen({ name: 'login' }); }}>ログインに戻る</button>
+            <button className="md-btn md-filled" disabled={busy}>パスワードを変更</button>
+            <button type="button" className="md-btn md-text" onClick={() => { setError(''); setScreen({ name: 'login' }); }}>ログインに戻る</button>
           </form>
         )}
 
@@ -330,11 +330,11 @@ export function SsoApp() {
             <p className="sso-error">
               {screen.email} では {appName} を使えません。ダッシュボードの管理者に、使えるアプリへの追加を頼んでください。
             </p>
-            <button className="btn btn-block" onClick={switchAccount}>別のアカウントでログイン</button>
+            <button className="md-btn md-outlined" onClick={switchAccount}>別のアカウントでログイン</button>
           </div>
         )}
       </div>
-      <p className="muted small sso-foot">パスワードは Amazon Cognito で確認され、このページには保存されません。</p>
+      <p className="sso-foot">パスワードは Amazon Cognito で確認され、このページには保存されません。</p>
     </div>
   );
 }
