@@ -30,8 +30,8 @@ export const APPS: AppDef[] = [
   },
   {
     id: 'kakeibo',
-    name: '家計簿',
-    description: 'Apple Pay で払うと自動で記録される家計簿',
+    name: 'MyKakeibo!',
+    description: 'Apple Pay で払うと自動で記録される家計簿アプリ',
     icon: '💴',
     url: 'https://kakeibo.wakalabo.net',
     repo: 'ikumi10132/kakeibo',
