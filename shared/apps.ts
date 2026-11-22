@@ -37,6 +37,15 @@ export const APPS: AppDef[] = [
     repo: 'ikumi10132/kakeibo',
     stack: 'Kakeibo',
   },
+  {
+    id: 'waripo',
+    name: 'waripo',
+    description: '2 人の割り勘と貸し借りの精算。家計簿と連動',
+    icon: '🤝',
+    url: 'https://waripo.wakalabo.net',
+    repo: 'ikumi10132/waripo',
+    stack: 'Waripo',
+  },
 ];
 
 /** このダッシュボード自身 (利用料の集計にだけ使う) */
