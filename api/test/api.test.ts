@@ -33,7 +33,7 @@ test('サービス別とアプリ別を 1 回の結果から集計する', () =>
   assert.deepEqual(u.thisMonth.apps, [
     { name: UNTAGGED, amount: 0.3 },
     { name: 'おうちダッシュボード', amount: 0.2 },
-    { name: '家計簿', amount: 0.15 },
+    { name: 'MyKakeibo!', amount: 0.15 },
   ]);
   assert.equal(u.appsNote, undefined);
 });
