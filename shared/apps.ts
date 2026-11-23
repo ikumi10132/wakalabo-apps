@@ -46,6 +46,15 @@ export const APPS: AppDef[] = [
     repo: 'ikumi10132/waripo',
     stack: 'Waripo',
   },
+  {
+    id: 'mytask',
+    name: 'MyTask!',
+    description: '前回から何日・家計簿連携つきのタスク管理',
+    icon: '✅',
+    url: 'https://mytask.wakalabo.net',
+    repo: 'ikumi10132/mytask',
+    stack: 'MyTask',
+  },
 ];
 
 /** このダッシュボード自身 (利用料の集計にだけ使う) */
