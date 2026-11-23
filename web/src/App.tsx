@@ -4,8 +4,7 @@ import { api, AuthError } from './api';
 import { handleRedirect, isLoggedIn, login, logout } from './auth';
 import { AppsGrid } from './components/AppsGrid';
 import { AwsPanel } from './components/AwsPanel';
-import { IconChart, IconCloud, IconGrid, IconLogout, IconUsers, IconKey } from './components/Icons';
-import { UsagePanel } from './components/UsagePanel';
+import { IconCloud, IconGrid, IconLogout, IconUsers, IconKey } from './components/Icons';
 import { Users } from './components/Users';
 
 /** W-SSO のパスキーの管理画面 (同じサイトの sso.html) */
@@ -55,7 +54,7 @@ export interface Shared {
   handleError: (e: unknown) => void;
 }
 
-type Tab = 'apps' | 'aws' | 'usage' | 'users';
+type Tab = 'apps' | 'aws' | 'users';
 
 interface NavItem {
   id: Tab;
@@ -67,7 +66,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'apps', label: 'アプリ', icon: (s) => <IconGrid size={s} /> },
   { id: 'aws', label: 'AWS', icon: (s) => <IconCloud size={s} />, adminOnly: true },
-  { id: 'usage', label: '使用量', icon: (s) => <IconChart size={s} />, adminOnly: true },
   { id: 'users', label: 'ユーザー管理', icon: (s) => <IconUsers size={s} />, adminOnly: true },
 ];
 
@@ -170,7 +168,6 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
           </>
         )}
         {data && tab === 'aws' && isAdmin && <AwsPanel {...shared} />}
-        {data && tab === 'usage' && isAdmin && <UsagePanel {...shared} />}
         {data && tab === 'users' && isAdmin && <Users {...shared} me={data.me.username} />}
       </main>
 
