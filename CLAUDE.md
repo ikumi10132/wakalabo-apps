@@ -91,3 +91,4 @@ Constraints for each level:
 - リポジトリは公開 (CloudShell から認証なしで clone するため)。メールアドレスなどの個人情報や秘密情報は置かない
 - 費用はできるだけ 0 円に近づける。Cost Explorer API は 1 回 0.01 USD なので、結果を SSM に 12 時間保存している
 - 変更したら `npm run typecheck` と `npm test` を通す
+- トークン使用量は DynamoDB (`UsageTable`)。`POST /usage` だけログインなしで、管理者が発行した送信用キー (DB には SHA-256 だけ) で受ける。キーや API の URL を含む設定はリポジトリに置かない

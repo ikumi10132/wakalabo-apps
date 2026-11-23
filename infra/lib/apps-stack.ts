@@ -6,6 +6,7 @@ import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -167,6 +168,14 @@ export class AppsStack extends cdk.Stack {
       description: 'Lambda が書き込む利用料のキャッシュ (手で編集しない)',
     });
 
+    // トークン使用量と、使用量の送信用キー (オンデマンド課金なので、使わなければ 0 円)
+    const usageTable = new dynamodb.Table(this, 'UsageTable', {
+      partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     const fn = new nodejs.NodejsFunction(this, 'ApiFunction', {
       entry: path.join(root, 'api/src/handler.ts'),
       projectRoot: root,
@@ -178,6 +187,7 @@ export class AppsStack extends cdk.Stack {
       environment: {
         USER_POOL_ID: userPool.userPoolId,
         COST_CACHE_PARAM: costCache.parameterName,
+        USAGE_TABLE: usageTable.tableName,
         NODE_OPTIONS: '--enable-source-maps',
       },
       bundling: { minify: true, sourceMap: true, externalModules: [] },
@@ -188,6 +198,7 @@ export class AppsStack extends cdk.Stack {
     });
     costCache.grantRead(fn);
     costCache.grantWrite(fn);
+    usageTable.grantReadWriteData(fn);
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -231,6 +242,12 @@ export class AppsStack extends cdk.Stack {
     api.addRoutes({ path: '/costs', methods: [GET], integration });
     api.addRoutes({ path: '/admin/users', methods: [GET, POST], integration });
     api.addRoutes({ path: '/admin/users/{username}', methods: [PUT, DELETE], integration });
+    api.addRoutes({ path: '/admin/usage', methods: [GET], integration });
+    api.addRoutes({ path: '/admin/usage-keys', methods: [GET, POST], integration });
+    api.addRoutes({ path: '/admin/usage-keys/{id}', methods: [DELETE], integration });
+    // 使用量の送信だけは、ログインなしで受ける (Claude Code の hook やアプリのサーバーから送るため)。
+    // Lambda が、管理者の発行した送信用キーを確認する。回数の上限は下の stage の設定 (毎秒 10 回) が守る
+    api.addRoutes({ path: '/usage', methods: [POST], integration, authorizer: new apigw.HttpNoneAuthorizer() });
     const stage = api.defaultStage?.node.defaultChild as apigw.CfnStage;
     stage.defaultRouteSettings = { throttlingBurstLimit: 20, throttlingRateLimit: 10 };
 

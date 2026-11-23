@@ -5,7 +5,7 @@
   "workspaces": ["api", "web", "infra"],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test -w api",
+    "test": "npm run test -w api && node --test tools/claude-code-usage/*.test.mjs",
     "dev": "npm run dev -w web",
     "build": "npm run build -w web",
     "deploy": "npm run build -w web && npm run deploy -w infra"
