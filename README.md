@@ -4,6 +4,7 @@ wakalabo の Web アプリをまとめるダッシュボードと、全アプリ
 
 - **アプリ一覧**: 使えるアプリだけが表示されます (管理者はすべて)
 - **AWS** (管理者のみ): クレジットの残高と期限、今月・先月の利用額、アプリ別・サービス別の内訳、AWS コンソールへのリンク
+- **使用量** (管理者のみ): Claude のトークン使用量を、ユーザー別・アプリ別 (アプリと Claude Code) に月ごとで表示。送信用キーの発行と取り消し
 - **ユーザー管理** (管理者のみ): ユーザーの追加、使えるアプリの設定、管理者の切り替え、仮パスワードの再設定、停止、削除
 
 ```
@@ -71,6 +72,16 @@ read -p "メールアドレス: " EMAIL && read -s -p "パスワード: " PW && 
 kakeibo と同じ手順です。CloudShell で us-east-1 に証明書を申請し、確認用の CNAME をお名前.com に登録、
 `ISSUED` になったら `infra/cdk.json` の context に `domainName` と `certificateArn` を書いてデプロイし、
 お名前.com で `apps` の CNAME を `WakalaboApps.CloudFrontDomain` に向けます。
+
+## Claude のトークン使用量
+
+DynamoDB のテーブル (`UsageTable`、オンデマンド課金) に、日・ユーザー・発生元 (`claude-code` / `app:<id>`)・モデルごとに足し込みます。
+
+- 送信: `POST /usage` (ログインなし。管理者が「使用量」画面で発行した送信用キーを `x-wakalabo-key` ヘッダーで送る。DB にはキーの SHA-256 だけを保存)
+- 表示: `GET /admin/usage?month=YYYY-MM` (管理者のみ)、キーの管理は `/admin/usage-keys`
+- Claude Code から送る hook: [`tools/claude-code-usage/`](tools/claude-code-usage/README.md)
+- アプリから送る: `shared/usage-client.ts` を各アプリにコピーして使う
+- 月の集計は Scan で読みます (行数は 日数 × ユーザー × 発生元 × モデル 程度)。ユーザーが大きく増えたら月ごとの索引を検討してください
 
 ## アプリ別の利用料
 

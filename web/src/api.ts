@@ -1,4 +1,4 @@
-import type { AdminUser, AppsResponse, CostsResponse } from '../../shared/types';
+import type { AdminUser, AppsResponse, CostsResponse, UsageKey, UsageResponse } from '../../shared/types';
 import { getAccessToken } from './auth';
 import { getConfig } from './config';
 
@@ -37,4 +37,9 @@ export const api = {
     send<{ ok: true }>('POST', '/admin/users', body),
   updateUser: (username: string, body: UserChange) => send<{ ok: true }>('PUT', `/admin/users/${enc(username)}`, body),
   deleteUser: (username: string) => send<{ ok: true }>('DELETE', `/admin/users/${enc(username)}`),
+  usage: (month: string) => call<UsageResponse>(`/admin/usage?month=${enc(month)}`),
+  usageKeys: () => call<UsageKey[]>('/admin/usage-keys'),
+  createUsageKey: (body: { label: string; scope: 'user' | 'service'; username?: string }) =>
+    send<{ key: string; id: string }>('POST', '/admin/usage-keys', body),
+  deleteUsageKey: (id: string) => send<{ ok: true }>('DELETE', `/admin/usage-keys/${enc(id)}`),
 };
