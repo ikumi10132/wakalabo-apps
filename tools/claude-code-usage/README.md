@@ -12,7 +12,7 @@ Claude Code で使ったトークン量を、apps.wakalabo.net の「使用量�
    { "url": "https://<API の URL>", "key": "wk_..." }
    ```
 
-   API の URL はデプロイ後に表示される `ApiUrl`、または `config.json` の `apiUrl` と同じです。
+   API の URL は、デプロイ後に https://apps.wakalabo.net/config.json を開くと出てくる `apiUrl` の値です。
    `config.json` の代わりに、環境変数 `WAKALABO_USAGE_URL` / `WAKALABO_USAGE_KEY` でも設定できます。
 4. `~/.claude/settings.json` に hook を足す:
 
