@@ -43,6 +43,18 @@ wakalabo の全アプリで使うログインです。ログイン画面は自�
 
 1. `shared/apps.ts` の `APPS` に追加してデプロイ (グループと、W-SSO から戻れる URL に追加される)
 2. アプリ側: `wsso-client.ts` をコピーし、CDK で上の SSM パラメータを読む。AWS リソースに `app=<id>` のタグを付ける
+3. ログ: `web/src/wakalabo-log.ts` をコピーして画面で `initLog` / `logView` を呼び、CDK で API Gateway のアクセスログを `/wakalabo/access/<id>` に残す (形は `ACCESS_LOG_FORMAT`)。操作の表示名は `shared/logs.ts` の `ACTION_LABELS` に足す
+4. 古い iPad 対応: `web/legacy-css.ts` をコピーし、`vite.config.ts` を他のアプリと同じにする (`@vitejs/plugin-legacy`)
+
+## ログ (管理者だけ)
+
+ダッシュボードの「ログ」で、全アプリの記録を見られます。90 日で消えます。
+
+- **操作**: 誰が・どの操作を・結果 (200 / 400 番台 / 500 番台)・応答時間・端末。各アプリの API Gateway のアクセスログ (`/wakalabo/access/<アプリ>`)
+- **画面**: どの画面を開いたか・画面で起きたエラー・表示にかかった時間。各アプリの画面が `POST /events` に送る (`/wakalabo/events`)
+- 残さないもの: URL のパスやクエリ (ショートカットのトークンや明細の ID)、入力した内容 (金額・店名・メモ・タスク名)
+- 検索は CloudWatch Logs Insights (調べたデータ 1 GB あたり約 0.0076 USD。2 人の利用ならほぼ 0 円)
+- 各アプリのログは、wakalabo-apps をデプロイした後に、そのアプリをデプロイし直すと記録が始まります
 
 ## デプロイ (ブラウザだけでできます)
 
