@@ -18,6 +18,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { ADMIN_GROUP, APPS, appGroup, SELF_APP_ID } from '../../shared/apps.js';
 import { ACCESS_LOG_PREFIX, EVENTS_LOG_GROUP, EVENTS_URL_PARAM } from '../../shared/logs.js';
+import { securityHeadersPolicy } from './csp.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LOCAL_DEV_URL = 'http://localhost:5173';
@@ -67,11 +68,13 @@ export class AppsStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
+    // 応答ヘッダー: CSP (動かしてよいスクリプト・通信してよい相手) と安全のためのヘッダー (infra/lib/csp.ts)
+    const securityHeaders = securityHeadersPolicy(this, 'SecurityHeaders', { distDir: path.join(root, 'web/dist'), region: this.region });
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+        responseHeadersPolicy: securityHeaders,
       },
       defaultRootObject: 'index.html',
       errorResponses: [403, 404].map((httpStatus) => ({ httpStatus, responseHttpStatus: 200, responsePagePath: '/index.html' })),
