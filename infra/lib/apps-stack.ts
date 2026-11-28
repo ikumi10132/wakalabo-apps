@@ -22,6 +22,12 @@ import { securityHeadersPolicy } from './csp.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LOCAL_DEV_URL = 'http://localhost:5173';
+/**
+ * ローカル開発 (npm run dev) の画面からの呼び出し。本番では許可せず、
+ * `npx cdk deploy -c localDev=true` でデプロイしたときだけ許可する
+ */
+const devOrigins = (scope: Construct): string[] =>
+  [true, 'true'].includes(scope.node.tryGetContext('localDev')) ? [LOCAL_DEV_URL] : [];
 /** 他のアプリが共通ログインの設定を読むための SSM パラメータの置き場所 */
 export const AUTH_PARAM_PREFIX = '/wakalabo/auth';
 
@@ -116,23 +122,8 @@ export class AppsStack extends cdk.Stack {
       description: 'ダッシュボードの管理 (ユーザー管理・利用料の表示)。すべてのアプリを使える',
     });
 
-    const oauthClient = (cid: string, urls: string[]) =>
-      userPool.addClient(cid, {
-        generateSecret: false,
-        oAuth: {
-          flows: { authorizationCodeGrant: true },
-          scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
-          callbackUrls: urls.map((u) => `${u}/`),
-          logoutUrls: urls.map((u) => `${u}/`),
-        },
-        preventUserExistenceErrors: true,
-        accessTokenValidity: cdk.Duration.hours(1),
-        idTokenValidity: cdk.Duration.hours(1),
-        refreshTokenValidity: cdk.Duration.days(30),
-      });
-
-    // ダッシュボード自身 (Cognito のログイン画面を使っていたころのもの。W-SSO に移ったので使っていない)
-    const portalClient = oauthClient('PortalClient', [...siteUrls, LOCAL_DEV_URL]);
+    // Cognito のログイン画面 (Hosted UI) を使っていたころのクライアント (PortalClient と、アプリごとの Client<アプリ>) は、
+    // W-SSO に移って使わなくなったので消した (攻撃に使える入口を減らすため)。ユーザーやパスキーには影響しない
 
     // ---------- W-SSO (自作のログイン画面 /sso.html で使う、全アプリ共通のクライアント) ----------
     // パスワードは画面から Cognito に直接送る (USER_PASSWORD_AUTH、通信は HTTPS)。
@@ -143,8 +134,10 @@ export class AppsStack extends cdk.Stack {
       authFlows: { userPassword: true, user: true },
       preventUserExistenceErrors: true,
       enableTokenRevocation: true,
-      accessTokenValidity: cdk.Duration.hours(1),
-      idTokenValidity: cdk.Duration.hours(1),
+      // ダッシュボードでユーザーを停止・削除したり、アプリの権限を外したりしたときに、早く効くように短くする
+      // (各アプリの API はトークンの中身で判断するため。期限が切れると画面が自動で取り直す)
+      accessTokenValidity: cdk.Duration.minutes(15),
+      idTokenValidity: cdk.Duration.minutes(15),
       refreshTokenValidity: cdk.Duration.days(30),
     });
     new ssm.StringParameter(this, 'WssoClientParam', {
@@ -158,9 +151,9 @@ export class AppsStack extends cdk.Stack {
       description: 'W-SSO のログイン画面がある URL',
     });
     // W-SSO がログイン後に戻ってよいアプリ (これ以外には戻さない)
-    const allowedOrigins = [...new Set([...siteUrls, ...APPS.map((a) => new URL(a.url).origin), LOCAL_DEV_URL])];
+    const allowedOrigins = [...new Set([...siteUrls, ...APPS.map((a) => new URL(a.url).origin), ...devOrigins(this)])];
 
-    // 各アプリ用。グループ (app-<id>) と、アプリ側の CDK が読むための SSM パラメータも作る。
+    // 各アプリ用のグループ (app-<id>)。
     // 同じユーザープールなので、どれか 1 つでログインすれば、他のアプリもログイン画面を通るだけで入れる
     for (const app of APPS) {
       const cid = app.id.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
@@ -168,12 +161,6 @@ export class AppsStack extends cdk.Stack {
         userPoolId: userPool.userPoolId,
         groupName: appGroup(app.id),
         description: `${app.name} を使えるユーザー`,
-      });
-      const client = oauthClient(`Client${cid}`, [app.url, LOCAL_DEV_URL]);
-      new ssm.StringParameter(this, `ClientParam${cid}`, {
-        parameterName: `${AUTH_PARAM_PREFIX}/clients/${app.id}`,
-        stringValue: client.userPoolClientId,
-        description: `${app.name} の共通ログイン用クライアント ID`,
       });
     }
     new ssm.StringParameter(this, 'UserPoolIdParam', {
@@ -226,6 +213,8 @@ export class AppsStack extends cdk.Stack {
           'cognito-idp:AdminEnableUser',
           'cognito-idp:AdminDisableUser',
           'cognito-idp:AdminDeleteUser',
+          // 停止・削除したユーザーを、すべての端末からログアウトさせる
+          'cognito-idp:AdminUserGlobalSignOut',
           'cognito-idp:AdminAddUserToGroup',
           'cognito-idp:AdminRemoveUserFromGroup',
         ],
@@ -240,7 +229,7 @@ export class AppsStack extends cdk.Stack {
     const authorizer = new HttpJwtAuthorizer(
       'CognitoAuthorizer',
       `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
-      { jwtAudience: [portalClient.userPoolClientId, wssoClient.userPoolClientId] },
+      { jwtAudience: [wssoClient.userPoolClientId] },
     );
     const api = new apigw.HttpApi(this, 'HttpApi', {
       defaultAuthorizer: authorizer,

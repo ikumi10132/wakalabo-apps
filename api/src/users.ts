@@ -9,6 +9,7 @@ import {
   AdminListGroupsForUserCommand,
   AdminRemoveUserFromGroupCommand,
   AdminSetUserPasswordCommand,
+  AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
   ListUsersCommand,
   ListUsersInGroupCommand,
@@ -129,12 +130,22 @@ export async function resetPassword(username: string, password: string): Promise
   await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: POOL, Username: username, Password: password, Permanent: false }));
 }
 
+/**
+ * すべての端末からログアウトさせる (W-SSO のリフレッシュトークンを無効にする)。
+ * 発行済みのアクセストークンは期限 (15 分) まで使えるが、それ以上は延長できなくなる
+ */
+async function signOutEverywhere(username: string): Promise<void> {
+  await cognito.send(new AdminUserGlobalSignOutCommand({ UserPoolId: POOL, Username: username }));
+}
+
 export async function setEnabled(username: string, enabled: boolean): Promise<void> {
   const input = { UserPoolId: POOL, Username: username };
+  if (!enabled) await signOutEverywhere(username);
   await cognito.send(enabled ? new AdminEnableUserCommand(input) : new AdminDisableUserCommand(input));
 }
 
 export async function deleteUser(username: string): Promise<void> {
+  await signOutEverywhere(username);
   await cognito.send(new AdminDeleteUserCommand({ UserPoolId: POOL, Username: username }));
 }
 

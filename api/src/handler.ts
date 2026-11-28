@@ -116,6 +116,13 @@ async function adminRoute(event: APIGatewayProxyEventV2WithJWTAuthorizer, c: Cal
   }
 }
 
+/**
+ * 画面に返してよいエラー文か。アプリが自分で投げた Error (日本語の説明) だけを返し、
+ * AWS の SDK のエラー (アカウント ID や ARN が入ることがある) やプログラムの誤り (TypeError など) は返さない
+ */
+const publicMessage = (e: unknown) =>
+  e instanceof Error && e.constructor === Error ? e.message : 'サーバーでエラーが発生しました。時間をおいてもう一度お試しください';
+
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyStructuredResultV2> {
   try {
     const c = caller(event);
@@ -137,6 +144,6 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   } catch (e) {
     if (e instanceof HttpError) return json(e.status, { message: e.message });
     console.error(e);
-    return json(500, { message: e instanceof Error ? e.message : 'エラーが発生しました' });
+    return json(500, { message: publicMessage(e) });
   }
 }
