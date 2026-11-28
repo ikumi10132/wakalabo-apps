@@ -16,6 +16,7 @@ import {
   EVENTS_LOG_GROUP,
   LOG_APPS,
   LOG_HOURS,
+  type LogBucket,
   type LogFilterKind,
   type LogKind,
   type LogRow,
@@ -74,6 +75,61 @@ export const apiErrorsQuery = (q: LogQuery) =>
 /** アプリごとの画面のログの件数 */
 export const eventStatsQuery = (q: LogQuery) =>
   `filter ispresent(message.kind)\n${q.app ? `| filter message.app = "${q.app}"\n` : ''}${userFilter(q)}| stats count(*) as n by message.app, message.kind`;
+
+/** 期間全体の件数・応答時間・人数 (API) */
+export const totalsQuery = (q: LogQuery) =>
+  `filter ispresent(route) and route != "POST /events"\n${userFilter(q)}| stats count(*) as n, avg(latency) as avgMs, pct(latency, 95) as p95, count_distinct(sub) as users`;
+
+/** グラフの 1 本の幅 (分)。どの期間でも 12〜30 本くらいになるようにする */
+export function bucketMinutes(hours: number): number {
+  if (hours <= 1) return 5;
+  if (hours <= 24) return 60;
+  if (hours <= 24 * 7) return 6 * 60;
+  if (hours <= 24 * 30) return 24 * 60;
+  return 3 * 24 * 60;
+}
+const binExpr = (m: number) => (m % (24 * 60) === 0 ? `${m / (24 * 60)}d` : m % 60 === 0 ? `${m / 60}h` : `${m}m`);
+
+/** 時間ごとの件数 (API の全体・API のエラー・画面のエラー) */
+export const timelineQueries = (q: LogQuery, m: number) => ({
+  requests: `filter ispresent(route) and route != "POST /events"\n${userFilter(q)}| stats count(*) as n by bin(${binExpr(m)}) as t`,
+  serverErrors: `filter status >= 500 and route != "POST /events"\n${userFilter(q)}| stats count(*) as n by bin(${binExpr(m)}) as t`,
+  screenErrors: `filter message.kind = "error"\n${q.app ? `| filter message.app = "${q.app}"\n` : ''}${userFilter(q)}| stats count(*) as n by bin(${binExpr(m)}) as t`,
+});
+
+/** Logs Insights の時刻 ("2026-11-28 10:00:00.000"、UTC) */
+const insightsTime = (v: string | undefined) => new Date(`${v?.replace(' ', 'T')}Z`).getTime();
+
+/** 期間を同じ幅に区切り、件数のない区切りも 0 で埋める */
+export function toTimeline(
+  from: Date,
+  to: Date,
+  minutes: number,
+  requests: Record<string, string>[],
+  errors: Record<string, string>[][],
+): LogBucket[] {
+  const size = minutes * 60_000;
+  const first = Math.floor(from.getTime() / size) * size;
+  const buckets: LogBucket[] = [];
+  const index = new Map<number, LogBucket>();
+  for (let t = first; t <= to.getTime(); t += size) {
+    const b = { start: new Date(t).toISOString(), requests: 0, errors: 0 };
+    buckets.push(b);
+    index.set(t, b);
+  }
+  const at = (r: Record<string, string>) => index.get(Math.floor(insightsTime(r.t) / size) * size);
+  for (const r of requests) {
+    const b = at(r);
+    if (b) b.requests += num(r.n) ?? 0;
+  }
+  for (const list of errors) {
+    for (const r of list) {
+      const b = at(r);
+      if (b) b.errors += num(r.n) ?? 0;
+    }
+  }
+  return buckets;
+}
 
 // ---------- 実行 ----------
 
@@ -164,6 +220,7 @@ export function toRow(r: Record<string, string>, emails: Map<string, string>): L
     kind: 'api',
     user: sub ? (emails.get(sub) ?? sub) : 'ショートカット・ログインなし',
     action: actionLabel(app, r.route ?? ''),
+    route: present(r.route),
     status: num(r.status),
     ms: num(r.latency),
     detail: present(r.err) ?? present(r.ierr),
@@ -200,6 +257,8 @@ export function toSummary(
     if (r['message.kind'] === 'view') s.views += num(r.n) ?? 0;
     if (r['message.kind'] === 'error') s.screenErrors += num(r.n) ?? 0;
   }
+  // 記録がないアプリも 0 件で並べる (デプロイし直していないアプリに気づけるように)
+  for (const a of LOG_APPS) get(a.id);
   const order = LOG_APPS.map((a) => a.id);
   return [...map.values()].sort((a, b) => order.indexOf(a.app) - order.indexOf(b.app));
 }
@@ -214,22 +273,49 @@ export async function searchLogs(q: LogQuery, users: { sub: string; email: strin
     ...(q.kind === 'view' ? [] : accessGroups),
     ...(q.kind === 'api' || !groups.events ? [] : [EVENTS_LOG_GROUP]),
   ];
-  if (!groups.access.length && !groups.events) {
-    return { rows: [], summary: [], users, truncated: false, note: 'まだログがありません。各アプリをデプロイし直すと記録が始まります' };
-  }
-  const [rows, apiStats, apiErrors, eventStats] = await Promise.all([
+  const minutes = bucketMinutes(q.hours);
+  const empty: LogsResponse = {
+    rows: [],
+    summary: [],
+    totals: { requests: 0, serverErrors: 0, clientErrors: 0, screenErrors: 0, views: 0, users: 0 },
+    timeline: toTimeline(from, to, minutes, [], []),
+    bucketMinutes: minutes,
+    users,
+    truncated: false,
+  };
+  if (!groups.access.length && !groups.events) return empty;
+  const tq = timelineQueries(q, minutes);
+  const events = (query: string) => (groups.events ? runQuery([EVENTS_LOG_GROUP], query, from, to, 1000) : Promise.resolve([]));
+  const [rows, apiStats, apiErrors, eventStats, totals, tlRequests, tlServer, tlScreen] = await Promise.all([
     runQuery(rowGroups, rowsQuery(q), from, to),
     runQuery(accessGroups, apiStatsQuery(q), from, to, 100),
     runQuery(accessGroups, apiErrorsQuery(q), from, to, 100),
-    groups.events ? runQuery([EVENTS_LOG_GROUP], eventStatsQuery(q), from, to, 100) : Promise.resolve([]),
+    events(eventStatsQuery(q)),
+    runQuery(accessGroups, totalsQuery(q), from, to, 1),
+    runQuery(accessGroups, tq.requests, from, to, 1000),
+    runQuery(accessGroups, tq.serverErrors, from, to, 1000),
+    events(tq.screenErrors),
   ]);
   const emails = new Map(users.map((u) => [u.sub, u.email]));
-  const missing = LOG_APPS.filter((a) => !groups.access.includes(`${ACCESS_LOG_PREFIX}${a.id}`)).map((a) => a.name);
+  const summary = toSummary(apiStats, apiErrors, eventStats).filter((x) => !q.app || x.app === q.app);
+  const sum = (k: 'serverErrors' | 'clientErrors' | 'screenErrors' | 'views') => summary.reduce((a, s) => a + s[k], 0);
+  const t = totals[0] ?? {};
   return {
     rows: rows.map((r) => toRow(r, emails)),
-    summary: toSummary(apiStats, apiErrors, eventStats),
+    summary: summary.map((x) => ({ ...x, recorded: groups.access.includes(`${ACCESS_LOG_PREFIX}${x.app}`) })),
+    totals: {
+      requests: num(t.n) ?? 0,
+      serverErrors: sum('serverErrors'),
+      clientErrors: sum('clientErrors'),
+      screenErrors: sum('screenErrors'),
+      views: sum('views'),
+      avgMs: num(t.avgMs) === undefined ? undefined : Math.round(num(t.avgMs)!),
+      p95Ms: num(t.p95) === undefined ? undefined : Math.round(num(t.p95)!),
+      users: num(t.users) ?? 0,
+    },
+    timeline: toTimeline(from, to, minutes, tlRequests, [tlServer, tlScreen]),
+    bucketMinutes: minutes,
     users,
     truncated: rows.length >= ROW_LIMIT,
-    ...(missing.length && { note: `まだ操作のログがないアプリ: ${missing.join('、')} (デプロイし直すと記録が始まります)` }),
   };
 }

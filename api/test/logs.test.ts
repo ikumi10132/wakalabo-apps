@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cleanEvent, MAX_EVENTS, parseEvents } from '../src/events.js';
-import { appFromLog, deviceFromUa, parseLogQuery, rowsQuery, toRow, toSummary } from '../src/logs.js';
+import { appFromLog, bucketMinutes, deviceFromUa, parseLogQuery, rowsQuery, timelineQueries, toRow, toSummary, toTimeline } from '../src/logs.js';
 
 const SUB = '11111111-2222-3333-4444-555555555555';
 
@@ -63,6 +63,7 @@ test('結果を一覧の行にする', () => {
     kind: 'api',
     user: 'a@example.com',
     action: '明細を追加',
+    route: 'POST /transactions',
     status: 502,
     ms: 1234,
     detail: 'Lambda timeout',
@@ -89,10 +90,10 @@ test('集計をアプリごとにまとめる', () => {
       { 'message.app': 'mytask', 'message.kind': 'error', n: '1' },
     ],
   );
-  assert.deepEqual(s, [
-    { app: 'kakeibo', requests: 10, serverErrors: 2, clientErrors: 3, avgMs: 120, p95Ms: 480, views: 7, screenErrors: 0 },
-    { app: 'mytask', requests: 0, serverErrors: 0, clientErrors: 0, views: 0, screenErrors: 1 },
-  ]);
+  assert.deepEqual(s.find((x) => x.app === 'kakeibo'), { app: 'kakeibo', requests: 10, serverErrors: 2, clientErrors: 3, avgMs: 120, p95Ms: 480, views: 7, screenErrors: 0 });
+  assert.deepEqual(s.find((x) => x.app === 'mytask'), { app: 'mytask', requests: 0, serverErrors: 0, clientErrors: 0, views: 0, screenErrors: 1 });
+  // 記録がないアプリも 0 件で並ぶ (デプロイし直していないアプリに気づけるように)
+  assert.deepEqual(s.map((x) => x.app), ['wakalabo-apps', 'smart-home', 'kakeibo', 'waripo', 'mytask']);
 });
 
 test('端末とアプリの見分け方', () => {
@@ -100,4 +101,19 @@ test('端末とアプリの見分け方', () => {
   assert.equal(deviceFromUa('Shortcuts/1 CFNetwork/1.0 Darwin/24'), 'iPhone のショートカット');
   assert.equal(deviceFromUa('-'), undefined);
   assert.equal(appFromLog('1:/aws/lambda/wakalabo-events'), 'wakalabo-apps');
+});
+
+test('グラフ: 期間を同じ幅に区切り、件数のない区切りは 0 にする', () => {
+  assert.deepEqual([1, 24, 168, 720, 2160].map(bucketMinutes), [5, 60, 360, 1440, 4320]);
+  assert.match(timelineQueries({ hours: 24, kind: 'all' }, 60).requests, /bin\(1h\)/);
+  assert.match(timelineQueries({ hours: 2160, kind: 'all' }, 4320).requests, /bin\(3d\)/);
+  const from = new Date('2026-11-28T00:10:00Z');
+  const to = new Date('2026-11-28T03:05:00Z');
+  const t = toTimeline(from, to, 60, [{ t: '2026-11-28 01:00:00.000', n: '5' }], [[{ t: '2026-11-28 01:00:00.000', n: '2' }], [{ t: '2026-11-28 03:00:00.000', n: '1' }]]);
+  assert.deepEqual(t, [
+    { start: '2026-11-28T00:00:00.000Z', requests: 0, errors: 0 },
+    { start: '2026-11-28T01:00:00.000Z', requests: 5, errors: 2 },
+    { start: '2026-11-28T02:00:00.000Z', requests: 0, errors: 0 },
+    { start: '2026-11-28T03:00:00.000Z', requests: 0, errors: 1 },
+  ]);
 });

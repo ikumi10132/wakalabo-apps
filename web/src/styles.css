@@ -592,22 +592,94 @@ a.md-btn { text-decoration: none; }
 }
 
 /* ---- ログ ---- */
-.logs-filters { display: flex; flex-direction: column; gap: 12px; }
-.logs-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
-.logs-summary td, .logs-summary th { white-space: nowrap; }
-.logs-summary tbody tr { cursor: default; }
-.logs-empty { padding: 16px; }
-.log-row { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; border-left: 3px solid transparent; }
-.list > li + li.log-row { border-top: 1px solid var(--surface-2); }
-.log-row.is-error { border-left-color: var(--danger); background: var(--danger-soft); }
-.log-row.is-warn { border-left-color: #e0a100; }
-.log-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.log-user { overflow-wrap: anywhere; }
-.log-main { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.log-kind { margin-left: 0; flex: none; }
-.log-kind-error { background: var(--danger-soft); color: var(--danger); }
-.log-kind-view { background: var(--accent-soft); color: var(--accent-strong); }
-.log-status, .log-ms { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
-.log-detail { font-size: 12px; color: var(--danger); overflow-wrap: anywhere; }
-.log-error { color: var(--danger); font-weight: 700; }
-.log-warn { color: #b07d00; font-weight: 700; }
+.logs { display: flex; flex-direction: column; gap: 16px; --chart-ok: #2f6bd0; --chart-err: #c4292e; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (prefers-color-scheme: dark) { .logs { --chart-ok: #5b8fe6; --chart-err: #e8604f; } }
+.logs.is-loading .logs-kpis, .logs.is-loading .card { opacity: 0.6; transition: opacity 0.2s; }
+.logs-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.logs-select { width: auto; min-width: 0; min-height: 36px; padding: 4px 32px 4px 10px; font-size: 13px; }
+.logs-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.t-error { color: var(--danger); font-weight: 700; }
+.t-warn { color: var(--warn); font-weight: 700; }
+
+/* 数字のタイル */
+.logs-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.lkpi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lkpi-label { font-size: 12px; color: var(--muted); }
+.lkpi-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lkpi-error { border-color: var(--danger); background: var(--danger-soft); }
+.lkpi-error .lkpi-value { color: var(--danger); }
+.lkpi-warn .lkpi-value { color: var(--warn); }
+@media (max-width: 1100px) { .logs-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* 件数の推移 */
+.logs-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.logs-legend li { display: flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.swatch-ok { background: var(--chart-ok); }
+.swatch-err { background: var(--chart-err); }
+.tl { display: flex; flex-direction: column; gap: 6px; }
+.tl-plot { position: relative; height: 180px; margin-left: 36px; }
+.tl-grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--surface-2); }
+.tl-grid span { position: absolute; right: 100%; transform: translateY(-50%); padding-right: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; }
+.tl-col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; outline: none; cursor: default; }
+.tl-col.is-hover, .tl-col:focus-visible { background: var(--surface); }
+.tl-stack { width: 100%; max-width: 28px; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+.tl-stack > div { min-height: 2px; }
+.tl-stack > div:first-child { border-radius: 4px 4px 0 0; }
+.tl-ok { background: var(--chart-ok); }
+.tl-err { background: var(--chart-err); }
+.tl-tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--text); color: var(--bg); border-radius: var(--radius-s); padding: 6px 10px; font-size: 12px; display: flex; flex-direction: column; pointer-events: none; white-space: nowrap; z-index: 2; box-shadow: 0 4px 16px rgb(0 0 0 / 0.2); }
+.tl-x { display: flex; margin-left: 36px; font-size: 11px; color: var(--muted); }
+.tl-x span { flex: 1; text-align: center; white-space: nowrap; overflow: visible; min-width: 0; }
+
+/* アプリ別 */
+.logs-apps { padding: 8px 16px; }
+.logs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.logs-table th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 500; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.logs-table td { padding: 9px 8px; border-bottom: 1px solid var(--surface-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.logs-table tr:last-child td { border-bottom: 0; }
+.logs-table .num { text-align: right; }
+.logs-table .is-empty td:first-child { color: var(--muted); }
+
+/* ログの一覧 (1 行 1 件、等幅) */
+.logs-stream { padding: 12px 0 4px; gap: 8px; }
+.logs-stream > .logs-card-head { padding: 0 16px; }
+.logs-count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.logs-empty { padding: 24px 16px; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.log-lines { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+.log-line { border-left: 3px solid transparent; }
+.log-line + .log-line { border-top: 1px solid var(--surface); }
+.log-line.lv-error { border-left-color: var(--chart-err); background: var(--danger-soft); }
+.log-line.lv-warn { border-left-color: var(--warn); }
+.log-line-main {
+  width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  display: grid; grid-template-columns: max-content 5ch 13ch 12ch minmax(0, 1fr) 3ch 8ch; gap: 12px; align-items: baseline;
+  padding: 5px 16px 5px 13px;
+}
+.log-line-main:hover { background: var(--surface); }
+.log-line-main > span, .log-line-main > time { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ll-time, .ll-app, .ll-user { color: var(--muted); }
+.ll-level { font-weight: 700; }
+.lv-info .ll-level { color: var(--muted); }
+.lv-warn .ll-level { color: var(--warn); }
+.lv-error .ll-level, .lv-error .ll-msg { color: var(--danger); }
+.ll-status, .ll-ms { text-align: right; font-variant-numeric: tabular-nums; }
+.log-detail { display: grid; grid-template-columns: 8ch minmax(0, 1fr); gap: 2px 12px; padding: 4px 16px 10px calc(13px + 12px); font-size: 12px; }
+.log-detail dt { color: var(--muted); }
+.log-detail dd { overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  .logs-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lkpi-value { font-size: 20px; }
+  .logs-select { flex: 1; }
+  .logs-table .opt { display: none; }
+  .logs-apps { padding: 4px 8px; }
+  .logs-table { font-size: 13px; }
+  .logs-table th, .logs-table td { padding: 8px 5px; }
+  .logs-table td:first-child { white-space: normal; }
+  .log-line-main { grid-template-columns: max-content 5ch minmax(0, 1fr) max-content; grid-template-areas: 'time level app ms' 'msg msg msg status'; row-gap: 0; gap: 0 10px; }
+  .ll-time { grid-area: time; } .ll-level { grid-area: level; } .ll-app { grid-area: app; } .ll-user { display: none; }
+  .ll-msg { grid-area: msg; } .ll-status { grid-area: status; } .ll-ms { grid-area: ms; }
+  .log-detail { padding-left: 16px; }
+}

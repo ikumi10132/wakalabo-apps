@@ -34,6 +34,8 @@ export interface LogRow {
   user: string;
   /** 操作の名前 (API) または画面の名前 */
   action: string;
+  /** API のルート (例: POST /transactions) */
+  route?: string;
   status?: number;
   ms?: number;
   /** エラーの内容 */
@@ -54,11 +56,39 @@ export interface LogSummary {
   views: number;
   /** 画面で起きたエラー */
   screenErrors: number;
+  /** この期間に操作の記録 (アクセスログのグループ) があるか */
+  recorded?: boolean;
+}
+
+/** 時間ごとの件数 (グラフ用) */
+export interface LogBucket {
+  /** 区切りの始まり */
+  start: string;
+  requests: number;
+  /** サーバーのエラー (5xx) と画面のエラー */
+  errors: number;
+}
+
+/** 期間全体の数字 */
+export interface LogTotals {
+  requests: number;
+  serverErrors: number;
+  clientErrors: number;
+  screenErrors: number;
+  views: number;
+  avgMs?: number;
+  p95Ms?: number;
+  /** 操作した人の数 */
+  users: number;
 }
 
 export interface LogsResponse {
   rows: LogRow[];
   summary: LogSummary[];
+  totals: LogTotals;
+  timeline: LogBucket[];
+  /** グラフの 1 本の幅 (分) */
+  bucketMinutes: number;
   /** 絞り込みの選択肢 */
   users: { sub: string; email: string }[];
   /** 表示件数の上限に達した */
