@@ -585,3 +585,8 @@ a.md-btn { text-decoration: none; }
 .side-nav .side-link { color: inherit; text-decoration: none; }
 .mobile-head .head-actions { display: flex; gap: 4px; }
 .mobile-head a.btn { text-decoration: none; }
+
+/* 古い Safari (iOS 14 まで) は aspect-ratio を使えないので、カレンダーのマスに高さを持たせる */
+@supports not (aspect-ratio: 1 / 1) {
+  .cal-day { min-height: 48px; }
+}

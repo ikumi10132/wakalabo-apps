@@ -1,13 +1,25 @@
+import legacy from '@vitejs/plugin-legacy';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { legacyCss } from './legacy-css';
 
+// 古い iPad (iOS 12 以降) でも開けるように、すべてのブラウザに同じ変換済みのコードを配る。
+// 新旧を出し分けると、Safari 13 のように「新しい版を選ぶが構文を読めない」世代で真っ白になるため。
 export default defineConfig({
-  plugins: [react()],
-  server: { port: 5173, strictPort: true },
+  plugins: [
+    react(),
+    legacy({
+      targets: ['ios >= 12', 'safari >= 12', 'defaults'],
+      renderModernChunks: false,
+    }),
+  ],
+  css: { postcss: { plugins: [legacyCss()] } },
   build: {
+    cssTarget: ['safari12', 'ios12'],
     rollupOptions: {
       // ダッシュボード (index.html) と W-SSO のログイン画面 (sso.html) の 2 ページ (web フォルダからの相対パス)
       input: { main: 'index.html', sso: 'sso.html' },
     },
   },
+  server: { port: 5173, strictPort: true },
 });
