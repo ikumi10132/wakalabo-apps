@@ -33,3 +33,5 @@ export const IconExternal = ({ size = 16 }: P) =>
   svg(size, <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6M10 14L21 3" /></>);
 export const IconKey = ({ size = 20 }: P) =>
   svg(size, <><circle cx="8" cy="15" r="4" /><path d="M10.85 12.15 19 4M17 6l3 3M15 8l2 2" /></>);
+export const IconLog = ({ size = 20 }: P) =>
+  svg(size, <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h5" /></>);

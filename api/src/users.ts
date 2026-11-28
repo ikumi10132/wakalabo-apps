@@ -154,3 +154,18 @@ export function cognitoMessage(e: unknown): string | undefined {
   }
 }
 export const ADMIN_GROUP_NAME = ADMIN_GROUP;
+
+/** ログの表示用: Cognito の sub (トークンに入っている利用者の ID) とメールアドレスの対応 */
+export async function subEmails(): Promise<{ sub: string; email: string }[]> {
+  const out: { sub: string; email: string }[] = [];
+  let token: string | undefined;
+  do {
+    const res = await cognito.send(new ListUsersCommand({ UserPoolId: POOL, PaginationToken: token, AttributesToGet: ['sub', 'email'] }));
+    for (const u of res.Users ?? []) {
+      const sub = attr(u.Attributes, 'sub');
+      if (sub) out.push({ sub, email: attr(u.Attributes, 'email') ?? sub });
+    }
+    token = res.PaginationToken;
+  } while (token);
+  return out.sort((a, b) => a.email.localeCompare(b.email));
+}

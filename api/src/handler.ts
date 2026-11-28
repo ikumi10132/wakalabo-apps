@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructured
 import { APPS } from '../../shared/apps.js';
 import type { AppsResponse } from '../../shared/types.js';
 import { getCosts } from './costs.js';
+import { parseLogQuery, searchLogs } from './logs.js';
 import * as users from './users.js';
 
 const COST_CACHE_PARAM = process.env.COST_CACHE_PARAM ?? '/wakalabo-apps/cache/costs';
@@ -69,6 +70,9 @@ async function adminRoute(event: APIGatewayProxyEventV2WithJWTAuthorizer, c: Cal
 
       case 'GET /admin/users':
         return json(200, await users.listUsers());
+
+      case 'GET /admin/logs':
+        return json(200, await searchLogs(parseLogQuery(event.queryStringParameters ?? {}), await users.subEmails()));
 
       case 'POST /admin/users': {
         const b = parseBody(event);

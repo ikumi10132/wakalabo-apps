@@ -4,12 +4,15 @@ import { api, AuthError } from './api';
 import { handleRedirect, isLoggedIn, login, logout } from './auth';
 import { AppsGrid } from './components/AppsGrid';
 import { AwsPanel } from './components/AwsPanel';
-import { IconCloud, IconGrid, IconLogout, IconUsers, IconKey } from './components/Icons';
+import { IconCloud, IconGrid, IconLog, IconLogout, IconUsers, IconKey } from './components/Icons';
+import { Logs } from './components/Logs';
 import { Users } from './components/Users';
+import { getAccessToken } from './auth';
+import { initLog, logView } from './wakalabo-log';
 
 /** W-SSO のパスキーの管理画面 (同じサイトの sso.html) */
 const PASSKEY_URL = () => `/sso.html?app=portal&manage=1&return=${encodeURIComponent(`${location.origin}/`)}`;
-import { loadConfig } from './config';
+import { getConfig, loadConfig } from './config';
 
 type Phase = { name: 'loading' } | { name: 'login' } | { name: 'ready' } | { name: 'error'; message: string };
 
@@ -54,7 +57,7 @@ export interface Shared {
   handleError: (e: unknown) => void;
 }
 
-type Tab = 'apps' | 'aws' | 'users';
+type Tab = 'apps' | 'aws' | 'users' | 'logs';
 
 interface NavItem {
   id: Tab;
@@ -67,6 +70,7 @@ const NAV: NavItem[] = [
   { id: 'apps', label: 'アプリ', icon: (s) => <IconGrid size={s} /> },
   { id: 'aws', label: 'AWS', icon: (s) => <IconCloud size={s} />, adminOnly: true },
   { id: 'users', label: 'ユーザー管理', icon: (s) => <IconUsers size={s} />, adminOnly: true },
+  { id: 'logs', label: 'ログ', icon: (s) => <IconLog size={s} />, adminOnly: true },
 ];
 
 function Main({ onAuthError }: { onAuthError: () => void }) {
@@ -89,6 +93,12 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
   useEffect(() => {
     api.apps().then(setData, handleError);
   }, [handleError]);
+
+  // ダッシュボード自身の画面のログ (どの画面を開いたか・エラー)
+  useEffect(() => {
+    initLog({ url: `${getConfig().apiUrl}/events`, app: 'wakalabo-apps', getToken: getAccessToken });
+  }, []);
+  useEffect(() => logView(NAV.find((n) => n.id === tab)?.label ?? tab), [tab]);
 
   const shared: Shared = { toast, handleError };
   const isAdmin = data?.me.isAdmin ?? false;
@@ -169,6 +179,7 @@ function Main({ onAuthError }: { onAuthError: () => void }) {
         )}
         {data && tab === 'aws' && isAdmin && <AwsPanel {...shared} />}
         {data && tab === 'users' && isAdmin && <Users {...shared} me={data.me.username} />}
+        {data && tab === 'logs' && isAdmin && <Logs {...shared} />}
       </main>
 
       {/* スマホの下のタブ (管理者だけ。管理者でなければアプリ一覧しかないので出さない) */}

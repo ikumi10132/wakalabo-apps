@@ -1,3 +1,4 @@
+import type { LogFilterKind, LogsResponse } from '../../shared/logs';
 import type { AdminUser, AppsResponse, CostsResponse } from '../../shared/types';
 import { getAccessToken } from './auth';
 import { getConfig } from './config';
@@ -37,4 +38,6 @@ export const api = {
     send<{ ok: true }>('POST', '/admin/users', body),
   updateUser: (username: string, body: UserChange) => send<{ ok: true }>('PUT', `/admin/users/${enc(username)}`, body),
   deleteUser: (username: string) => send<{ ok: true }>('DELETE', `/admin/users/${enc(username)}`),
+  logs: (q: { hours: number; app: string; user: string; kind: LogFilterKind }) =>
+    call<LogsResponse>(`/admin/logs?${new URLSearchParams({ hours: String(q.hours), app: q.app, user: q.user, kind: q.kind }).toString()}`),
 };

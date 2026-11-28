@@ -16,12 +16,34 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
-import { ADMIN_GROUP, APPS, appGroup } from '../../shared/apps.js';
+import { ADMIN_GROUP, APPS, appGroup, SELF_APP_ID } from '../../shared/apps.js';
+import { ACCESS_LOG_PREFIX, EVENTS_LOG_GROUP, EVENTS_URL_PARAM } from '../../shared/logs.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LOCAL_DEV_URL = 'http://localhost:5173';
 /** 他のアプリが共通ログインの設定を読むための SSM パラメータの置き場所 */
 export const AUTH_PARAM_PREFIX = '/wakalabo/auth';
+
+/**
+ * API Gateway のアクセスログの形 (1 リクエスト 1 行の JSON)。各アプリの CDK にも同じものを書く。
+ * URL のパスやクエリ (ショートカットのトークンや明細の ID が入る) と本文は残さない。ルートの名前 (routeKey) だけを残す
+ */
+export const ACCESS_LOG_FORMAT = JSON.stringify({
+  t: '$context.requestTimeEpoch',
+  id: '$context.requestId',
+  route: '$context.routeKey',
+  status: '$context.status',
+  latency: '$context.responseLatency',
+  ilatency: '$context.integrationLatency',
+  sub: '$context.authorizer.claims.sub',
+  ip: '$context.identity.sourceIp',
+  ua: '$context.identity.userAgent',
+  err: '$context.error.message',
+  ierr: '$context.integrationErrorMessage',
+})
+  // 数値は数値として残す (Logs Insights で平均などを出すため)。どちらも必ず値が入る
+  .replace('"$context.status"', '$context.status')
+  .replace('"$context.responseLatency"', '$context.responseLatency');
 
 export interface AppsStackProps extends cdk.StackProps {
   /** 独自ドメイン (apps.wakalabo.net)。certificateArn (us-east-1 の ACM) とセットで指定 */
@@ -174,7 +196,8 @@ export class AppsStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
       memorySize: 256,
-      timeout: cdk.Duration.seconds(20),
+      // ログの検索 (Logs Insights) を待つので長め (API Gateway の上限 30 秒より短く)
+      timeout: cdk.Duration.seconds(28),
       environment: {
         USER_POOL_ID: userPool.userPoolId,
         COST_CACHE_PARAM: costCache.parameterName,
@@ -219,7 +242,8 @@ export class AppsStack extends cdk.Stack {
     const api = new apigw.HttpApi(this, 'HttpApi', {
       defaultAuthorizer: authorizer,
       corsPreflight: {
-        allowOrigins: [...siteUrls, LOCAL_DEV_URL],
+        // 各アプリの画面からも、ログ (POST /events) を送れるようにする。管理用の API は管理者のトークンがないと使えない
+        allowOrigins: allowedOrigins,
         allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PUT, apigw.CorsHttpMethod.DELETE],
         allowHeaders: ['authorization', 'content-type'],
         maxAge: cdk.Duration.hours(1),
@@ -231,8 +255,55 @@ export class AppsStack extends cdk.Stack {
     api.addRoutes({ path: '/costs', methods: [GET], integration });
     api.addRoutes({ path: '/admin/users', methods: [GET, POST], integration });
     api.addRoutes({ path: '/admin/users/{username}', methods: [PUT, DELETE], integration });
+    api.addRoutes({ path: '/admin/logs', methods: [GET], integration });
     const stage = api.defaultStage?.node.defaultChild as apigw.CfnStage;
     stage.defaultRouteSettings = { throttlingBurstLimit: 20, throttlingRateLimit: 10 };
+
+    // ---------- ログ ----------
+    // 1. このダッシュボードの API のアクセスログ (各アプリも /wakalabo/access/<アプリ> に同じ形で残す)
+    const accessLogs = new logs.LogGroup(this, 'AccessLogs', {
+      logGroupName: `${ACCESS_LOG_PREFIX}${SELF_APP_ID}`,
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    stage.accessLogSettings = { destinationArn: accessLogs.logGroupArn, format: ACCESS_LOG_FORMAT };
+
+    // 2. 各アプリの画面から届くログ (開いた画面・画面のエラー・表示にかかった時間)。
+    //    受け取る Lambda のログそのものを使う。JSON 形式にして、START / END などの行は出さない
+    const eventsFn = new nodejs.NodejsFunction(this, 'EventsFunction', {
+      entry: path.join(root, 'api/src/events.ts'),
+      projectRoot: root,
+      depsLockFilePath: path.join(root, 'package-lock.json'),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      memorySize: 128,
+      timeout: cdk.Duration.seconds(5),
+      bundling: { minify: true, externalModules: [] },
+      loggingFormat: lambda.LoggingFormat.JSON,
+      applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
+      systemLogLevelV2: lambda.SystemLogLevel.WARN,
+      logGroup: new logs.LogGroup(this, 'EventsLogs', {
+        logGroupName: EVENTS_LOG_GROUP,
+        retention: logs.RetentionDays.THREE_MONTHS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    api.addRoutes({ path: '/events', methods: [POST], integration: new HttpLambdaIntegration('EventsIntegration', eventsFn) });
+    new ssm.StringParameter(this, 'EventsUrlParam', {
+      parameterName: EVENTS_URL_PARAM,
+      stringValue: `${api.apiEndpoint}/events`,
+      description: '各アプリの画面がログを送る先 (wakalabo-apps の POST /events)',
+    });
+
+    // 3. 管理画面の「ログ」: Logs Insights で /wakalabo/ のロググループを検索する
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['logs:StartQuery'],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/wakalabo/*`],
+      }),
+    );
+    // 検索結果の取得とロググループの一覧は、リソース単位の指定ができないので * になる (読み取りのみ)
+    fn.addToRolePolicy(new iam.PolicyStatement({ actions: ['logs:GetQueryResults', 'logs:DescribeLogGroups'], resources: ['*'] }));
 
     // ---------- 画面のデプロイ ----------
     new s3deploy.BucketDeployment(this, 'DeployWeb', {

@@ -590,3 +590,24 @@ a.md-btn { text-decoration: none; }
 @supports not (aspect-ratio: 1 / 1) {
   .cal-day { min-height: 48px; }
 }
+
+/* ---- ログ ---- */
+.logs-filters { display: flex; flex-direction: column; gap: 12px; }
+.logs-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.logs-summary td, .logs-summary th { white-space: nowrap; }
+.logs-summary tbody tr { cursor: default; }
+.logs-empty { padding: 16px; }
+.log-row { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; border-left: 3px solid transparent; }
+.list > li + li.log-row { border-top: 1px solid var(--surface-2); }
+.log-row.is-error { border-left-color: var(--danger); background: var(--danger-soft); }
+.log-row.is-warn { border-left-color: #e0a100; }
+.log-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-user { overflow-wrap: anywhere; }
+.log-main { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.log-kind { margin-left: 0; flex: none; }
+.log-kind-error { background: var(--danger-soft); color: var(--danger); }
+.log-kind-view { background: var(--accent-soft); color: var(--accent-strong); }
+.log-status, .log-ms { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.log-detail { font-size: 12px; color: var(--danger); overflow-wrap: anywhere; }
+.log-error { color: var(--danger); font-weight: 700; }
+.log-warn { color: #b07d00; font-weight: 700; }
